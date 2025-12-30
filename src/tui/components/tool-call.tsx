@@ -32,15 +32,40 @@ function ApprovalButtons({
   onApprovalResponse: ChatAddToolApproveResponseFunction;
 }) {
   const [selected, setSelected] = useState(0);
+  const [isTypingReason, setIsTypingReason] = useState(false);
+  const [reason, setReason] = useState("");
 
   useInput((input, key) => {
+    if (isTypingReason) {
+      if (key.escape) {
+        setIsTypingReason(false);
+        setReason("");
+      } else if (key.return && reason.trim()) {
+        onApprovalResponse({ id: approvalId, approved: false, reason: reason.trim() });
+      } else if (key.backspace || key.delete) {
+        setReason((prev) => prev.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta) {
+        setReason((prev) => prev + input);
+      }
+      return;
+    }
+
     const goUp = key.upArrow || input === "k" || (key.ctrl && input === "p");
     const goDown = key.downArrow || input === "j" || (key.ctrl && input === "n");
-    if (goUp || goDown) {
-      setSelected((prev) => (prev === 0 ? 1 : 0));
+    if (goUp) {
+      setSelected((prev) => (prev === 0 ? 2 : prev - 1));
+    }
+    if (goDown) {
+      setSelected((prev) => (prev === 2 ? 0 : prev + 1));
     }
     if (key.return) {
-      onApprovalResponse({ id: approvalId, approved: selected === 0 });
+      if (selected === 0) {
+        onApprovalResponse({ id: approvalId, approved: true });
+      } else if (selected === 1) {
+        onApprovalResponse({ id: approvalId, approved: false });
+      } else if (selected === 2) {
+        setIsTypingReason(true);
+      }
     }
   });
 
@@ -56,9 +81,22 @@ function ApprovalButtons({
           {selected === 1 ? "> " : "  "}
           <Text color={selected === 1 ? "red" : undefined}>2. No</Text>
         </Text>
+        <Text>
+          {selected === 2 ? "> " : "  "}
+          <Text color={selected === 2 ? "cyan" : undefined}>
+            3. Type here to tell the agent what to do differently
+          </Text>
+        </Text>
       </Box>
+      {isTypingReason && (
+        <Box marginTop={1} marginLeft={2}>
+          <Text color="cyan">Reason: </Text>
+          <Text>{reason}</Text>
+          <Text color="gray">█</Text>
+        </Box>
+      )}
       <Box marginTop={1}>
-        <Text color="gray">Esc to cancel</Text>
+        <Text color="gray">{isTypingReason ? "Enter to submit, Esc to cancel" : "Esc to cancel"}</Text>
       </Box>
     </Box>
   );
@@ -70,6 +108,8 @@ function ToolLayout({
   output,
   error,
   running,
+  denied,
+  denialReason,
   approvalRequested,
   approvalId,
   onApprovalResponse,
@@ -79,17 +119,19 @@ function ToolLayout({
   output?: ReactNode;
   error?: string;
   running: boolean;
+  denied?: boolean;
+  denialReason?: string;
   approvalRequested?: boolean;
   approvalId?: string;
   onApprovalResponse?: ChatAddToolApproveResponseFunction;
 }) {
-  const dotColor = approvalRequested ? "yellow" : running ? "yellow" : error ? "red" : "green";
+  const dotColor = denied ? "red" : approvalRequested ? "yellow" : running ? "yellow" : error ? "red" : "green";
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
       <Box>
         {running ? <ToolSpinner /> : <Text color={dotColor}>● </Text>}
-        <Text bold color={running || approvalRequested ? "yellow" : "white"}>
+        <Text bold color={denied ? "red" : running || approvalRequested ? "yellow" : "white"}>
           {name}
         </Text>
         <Text color="gray">(</Text>
@@ -105,6 +147,13 @@ function ToolLayout({
         <Box paddingLeft={2}>
           <Text color="gray">└ </Text>
           {output}
+        </Box>
+      )}
+
+      {denied && (
+        <Box paddingLeft={2}>
+          <Text color="gray">└ </Text>
+          <Text color="red">Denied{denialReason ? `: ${denialReason}` : ""}</Text>
         </Box>
       )}
 
@@ -126,6 +175,8 @@ function FileChangeLayout({
   lines,
   error,
   running,
+  denied,
+  denialReason,
   approvalRequested,
   approvalId,
   onApprovalResponse,
@@ -137,11 +188,13 @@ function FileChangeLayout({
   lines: DiffLine[];
   error?: string;
   running: boolean;
+  denied?: boolean;
+  denialReason?: string;
   approvalRequested?: boolean;
   approvalId?: string;
   onApprovalResponse?: ChatAddToolApproveResponseFunction;
 }) {
-  const dotColor = approvalRequested ? "yellow" : running ? "yellow" : error ? "red" : "green";
+  const dotColor = denied ? "red" : approvalRequested ? "yellow" : running ? "yellow" : error ? "red" : "green";
   const maxWidth = 80;
   const showDiff = approvalRequested || (!running && !error);
 
@@ -150,7 +203,7 @@ function FileChangeLayout({
       {/* Header: ● Update(src/tui/lib/markdown.ts) */}
       <Box>
         {running ? <ToolSpinner /> : <Text color={dotColor}>● </Text>}
-        <Text bold color={running || approvalRequested ? "yellow" : "white"}>
+        <Text bold color={denied ? "red" : running || approvalRequested ? "yellow" : "white"}>
           {action}
         </Text>
         <Text color="gray">(</Text>
@@ -220,6 +273,13 @@ function FileChangeLayout({
       {/* Approval buttons */}
       {approvalRequested && approvalId && onApprovalResponse && (
         <ApprovalButtons approvalId={approvalId} onApprovalResponse={onApprovalResponse} />
+      )}
+
+      {denied && (
+        <Box paddingLeft={2}>
+          <Text color="gray">└ </Text>
+          <Text color="red">Denied{denialReason ? `: ${denialReason}` : ""}</Text>
+        </Box>
       )}
 
       {error && (
@@ -324,6 +384,8 @@ export function ToolCall({
   const running =
     part.state === "input-streaming" || part.state === "input-available";
   const approvalRequested = part.state === "approval-requested";
+  const denied = part.state === "output-denied";
+  const denialReason = denied ? (part as { approval?: { reason?: string } }).approval?.reason : undefined;
   const error = part.state === "output-error" ? part.errorText : undefined;
   const approvalId = approvalRequested ? (part as { approval?: { id: string } }).approval?.id : undefined;
 
@@ -349,15 +411,23 @@ export function ToolCall({
       const lines = createWriteDiffLines(content);
       const additions = content ? content.split("\n").length : 0;
 
+      // Check for tool execution failure (success: false in output)
+      const outputError =
+        part.state === "output-available" && part.output?.success === false
+          ? part.output?.error ?? "Write failed"
+          : undefined;
+
       return (
         <FileChangeLayout
           action="Create"
           filePath={filePath}
           additions={additions}
           removals={0}
-          lines={running ? [] : lines}
-          error={error}
+          lines={running || denied || outputError ? [] : lines}
+          error={error ?? outputError}
           running={running}
+          denied={denied}
+          denialReason={denialReason}
           approvalRequested={approvalRequested}
           approvalId={approvalId}
           onApprovalResponse={onApprovalResponse}
@@ -371,15 +441,23 @@ export function ToolCall({
       const newString = part.input?.newString ?? "";
       const { lines, additions, removals } = createEditDiffLines(oldString, newString);
 
+      // Check for tool execution failure (success: false in output)
+      const outputError =
+        part.state === "output-available" && part.output?.success === false
+          ? part.output?.error ?? "Edit failed"
+          : undefined;
+
       return (
         <FileChangeLayout
           action="Update"
           filePath={filePath}
           additions={additions}
           removals={removals}
-          lines={running ? [] : lines}
-          error={error}
+          lines={running || denied || outputError ? [] : lines}
+          error={error ?? outputError}
           running={running}
+          denied={denied}
+          denialReason={denialReason}
           approvalRequested={approvalRequested}
           approvalId={approvalId}
           onApprovalResponse={onApprovalResponse}
@@ -439,6 +517,8 @@ export function ToolCall({
           }
           error={error}
           running={running}
+          denied={denied}
+          denialReason={denialReason}
           approvalRequested={approvalRequested}
           approvalId={approvalId}
           onApprovalResponse={onApprovalResponse}

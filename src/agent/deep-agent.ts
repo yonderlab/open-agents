@@ -47,8 +47,8 @@ const callOptionsSchema = z.object({
 
 export type DeepAgentCallOptions = z.infer<typeof callOptionsSchema>;
 
-// const model = gateway("anthropic/claude-haiku-4.5");
-const model = anthropic("claude-haiku-4-5");
+const model = gateway("anthropic/claude-haiku-4.5");
+// const model = anthropic("claude-haiku-4-5");
 
 export const deepAgent = new ToolLoopAgent({
   model: wrapLanguageModel({
