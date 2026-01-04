@@ -9,6 +9,7 @@ import { useChat } from "@ai-sdk/react";
 import { renderMarkdown } from "./lib/markdown.js";
 import { useChatContext } from "./chat-context.js";
 import { useReasoningContext } from "./reasoning-context.js";
+import { useExpandedView } from "./expanded-view-context.js";
 import { ToolCall } from "./components/tool-call.js";
 import { TaskGroupView } from "./components/task-group-view.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -26,15 +27,40 @@ type AppProps = {
   options: TUIOptions;
 };
 
-const TextPart = memo(function TextPart({ text }: { text: string }) {
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+const TextPart = memo(function TextPart({
+  text,
+  isExpanded,
+  timestamp,
+  model,
+}: {
+  text: string;
+  isExpanded?: boolean;
+  timestamp?: Date;
+  model?: string;
+}) {
   const rendered = useMemo(() => renderMarkdown(text), [text]);
 
   return (
     <Box>
       <Text>● </Text>
-      <Box flexShrink={1}>
+      <Box flexShrink={1} flexGrow={1}>
         <Text>{rendered}</Text>
       </Box>
+      {isExpanded && timestamp && model && (
+        <Box marginLeft={2} flexShrink={0}>
+          <Text color="gray">
+            {formatTime(timestamp)}   {model}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 });
@@ -80,14 +106,38 @@ type RenderPartOptions = {
   activeApprovalId: string | null;
   messageId: string;
   isStreaming: boolean;
+  isExpanded: boolean;
+  timestamp?: Date;
+  model?: string;
 };
+
+const ThinkingPart = memo(function ThinkingPart({
+  text,
+  isComplete,
+}: {
+  text: string;
+  isComplete: boolean;
+}) {
+  return (
+    <Box flexDirection="column" marginTop={1} marginBottom={1}>
+      <Text color="gray" italic>
+        ∴ {isComplete ? "Thinking..." : "Thinking..."}
+      </Text>
+      <Box marginLeft={2} marginTop={1}>
+        <Text color="gray" italic>
+          {text}
+        </Text>
+      </Box>
+    </Box>
+  );
+});
 
 function renderPart(
   part: TUIAgentUIMessagePart,
   key: string,
   options: RenderPartOptions,
 ) {
-  const { activeApprovalId, messageId, isStreaming } = options;
+  const { activeApprovalId, isExpanded, timestamp, model } = options;
 
   if (isToolUIPart(part)) {
     return (
@@ -98,9 +148,21 @@ function renderPart(
   switch (part.type) {
     case "text":
       if (!part.text) return null;
-      return <TextPart key={key} text={part.text} />;
+      return (
+        <TextPart
+          key={key}
+          text={part.text}
+          isExpanded={isExpanded}
+          timestamp={timestamp}
+          model={model}
+        />
+      );
 
     case "reasoning":
+      // Show reasoning inline when in expanded view
+      if (isExpanded && part.text) {
+        return <ThinkingPart key={key} text={part.text} isComplete={true} />;
+      }
       // Reasoning is tracked but not displayed inline (shown in status bar instead)
       return null;
 
@@ -158,11 +220,17 @@ const AssistantMessage = memo(function AssistantMessage({
   message,
   activeApprovalId,
   isStreaming,
+  isExpanded,
 }: {
   message: TUIAgentUIMessage;
   activeApprovalId: string | null;
   isStreaming: boolean;
+  isExpanded: boolean;
 }) {
+  const { state } = useChatContext();
+  const timestamp = (message as { createdAt?: Date }).createdAt;
+  const model = state.model;
+
   // Check if this message has reasoning and if reasoning is complete
   // Reasoning is complete when there are non-reasoning parts with content after reasoning
   const { hasReasoning, isReasoningComplete } = useMemo(() => {
@@ -252,6 +320,9 @@ const AssistantMessage = memo(function AssistantMessage({
           activeApprovalId,
           messageId: message.id,
           isStreaming,
+          isExpanded,
+          timestamp,
+          model,
         });
       })}
     </Box>
@@ -262,10 +333,12 @@ const Message = memo(function Message({
   message,
   activeApprovalId,
   isStreaming,
+  isExpanded,
 }: {
   message: TUIAgentUIMessage;
   activeApprovalId: string | null;
   isStreaming: boolean;
+  isExpanded: boolean;
 }) {
   if (message.role === "user") {
     return <UserMessage message={message} />;
@@ -276,6 +349,7 @@ const Message = memo(function Message({
         message={message}
         activeApprovalId={activeApprovalId}
         isStreaming={isStreaming}
+        isExpanded={isExpanded}
       />
     );
   }
@@ -286,10 +360,12 @@ const MessagesList = memo(function MessagesList({
   messages,
   activeApprovalId,
   isStreaming,
+  isExpanded,
 }: {
   messages: TUIAgentUIMessage[];
   activeApprovalId: string | null;
   isStreaming: boolean;
+  isExpanded: boolean;
 }) {
   return (
     <Box flexDirection="column">
@@ -299,6 +375,7 @@ const MessagesList = memo(function MessagesList({
           message={message}
           activeApprovalId={activeApprovalId}
           isStreaming={isStreaming && index === messages.length - 1}
+          isExpanded={isExpanded}
         />
       ))}
     </Box>
@@ -381,9 +458,18 @@ const InterruptedIndicator = memo(function InterruptedIndicator() {
   );
 });
 
+const ExpandedViewIndicator = memo(function ExpandedViewIndicator() {
+  return (
+    <Box marginTop={1} borderStyle="single" borderColor="gray" borderTop borderBottom={false} borderLeft={false} borderRight={false}>
+      <Text color="gray">Showing detailed transcript · ctrl+o to toggle</Text>
+    </Box>
+  );
+});
+
 function AppContent({ options }: AppProps) {
   const { exit } = useApp();
   const { chat, state, cycleAutoAcceptMode } = useChatContext();
+  const { isExpanded, toggleExpanded } = useExpandedView();
   const [wasInterrupted, setWasInterrupted] = useState(false);
 
   const { messages, sendMessage, status, stop, error } = useChat({
@@ -424,6 +510,9 @@ function AppContent({ options }: AppProps) {
       stop();
       exit();
     }
+    if (input === "o" && key.ctrl) {
+      toggleExpanded();
+    }
   });
 
   useEffect(() => {
@@ -454,6 +543,7 @@ function AppContent({ options }: AppProps) {
         messages={messages}
         activeApprovalId={activeApprovalId}
         isStreaming={isStreaming}
+        isExpanded={isExpanded}
       />
 
       {wasInterrupted && !isStreaming && <InterruptedIndicator />}
@@ -464,7 +554,7 @@ function AppContent({ options }: AppProps) {
         <StreamingStatusBar messages={messages} />
       )}
 
-      {!hasPendingApproval && (
+      {!hasPendingApproval && !isExpanded && (
         <InputBox
           onSubmit={handleSubmit}
           autoAcceptMode={state.autoAcceptMode}
@@ -475,6 +565,8 @@ function AppContent({ options }: AppProps) {
           pasteCollapseLineThreshold={pasteCollapseLineThreshold}
         />
       )}
+
+      {isExpanded && <ExpandedViewIndicator />}
     </Box>
   );
 }

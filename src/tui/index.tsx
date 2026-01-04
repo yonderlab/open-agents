@@ -3,12 +3,14 @@ import { render } from "ink";
 import { App } from "./app.js";
 import { ChatProvider } from "./chat-context.js";
 import { ReasoningProvider } from "./reasoning-context.js";
+import { ExpandedViewProvider } from "./expanded-view-context.js";
 import { tuiAgentModelId, createDefaultAgentOptions } from "./config.js";
 import type { TUIOptions } from "./types.js";
 
 export type { TUIOptions, AutoAcceptMode } from "./types.js";
 export { useChatContext, ChatProvider } from "./chat-context.js";
 export { useReasoningContext, ReasoningProvider } from "./reasoning-context.js";
+export { useExpandedView, ExpandedViewProvider } from "./expanded-view-context.js";
 export {
   tuiAgent,
   tuiAgentModelId,
@@ -46,7 +48,9 @@ export async function createTUI(options: TUIOptions): Promise<void> {
       workingDirectory={options.workingDirectory}
     >
       <ReasoningProvider>
-        <App options={options} />
+        <ExpandedViewProvider>
+          <App options={options} />
+        </ExpandedViewProvider>
       </ReasoningProvider>
     </ChatProvider>,
   );
@@ -70,7 +74,9 @@ export function renderTUI(options: TUIOptions) {
       workingDirectory={options.workingDirectory}
     >
       <ReasoningProvider>
-        <App options={options} />
+        <ExpandedViewProvider>
+          <App options={options} />
+        </ExpandedViewProvider>
       </ReasoningProvider>
     </ChatProvider>,
   );

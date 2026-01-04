@@ -286,7 +286,8 @@ export function TextInput({
       }
 
       // Ignore certain key combinations
-      if ((key.ctrl && input === "c") || (key.shift && key.tab)) {
+      const ignoredCtrlKeys = ["c", "o"];
+      if ((key.ctrl && ignoredCtrlKeys.includes(input)) || (key.shift && key.tab)) {
         return;
       }
 
