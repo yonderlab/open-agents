@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { AgentContext } from "../types";
+import type { AgentContext, AgentMode } from "../types";
 import type { Sandbox } from "../sandbox";
 
 /**
@@ -38,4 +38,27 @@ export function getSandbox(experimental_context: unknown): Sandbox {
     );
   }
   return context.sandbox;
+}
+
+/**
+ * Get agent mode from experimental context.
+ * Defaults to 'interactive' if not set (backward compatibility).
+ *
+ * @param experimental_context - The context passed to tool execute functions
+ * @returns The agent mode ('interactive' or 'background')
+ */
+export function getMode(experimental_context: unknown): AgentMode {
+  const context = experimental_context as AgentContext | undefined;
+  return context?.mode ?? "interactive";
+}
+
+/**
+ * Check if the agent is running in background mode.
+ * Useful for conditional logic in tools.
+ *
+ * @param experimental_context - The context passed to tool execute functions
+ * @returns true if running in background mode
+ */
+export function isBackgroundMode(experimental_context: unknown): boolean {
+  return getMode(experimental_context) === "background";
 }
