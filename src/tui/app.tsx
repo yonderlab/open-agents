@@ -32,7 +32,10 @@ const TextPart = memo(function TextPart({ text }: { text: string }) {
 
   return (
     <Box>
-      <Text>● {rendered}</Text>
+      <Text>● </Text>
+      <Box flexShrink={1}>
+        <Text>{rendered}</Text>
+      </Box>
     </Box>
   );
 });
