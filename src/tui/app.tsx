@@ -529,7 +529,7 @@ function AppContent({ options }: AppProps) {
 
   // Get approval info for the pending tool
   const approvalInfo = useMemo(() => {
-    if (!pendingToolPart) return null;
+    if (!pendingToolPart || !state.workingDirectory) return null;
     return getToolApprovalInfo(pendingToolPart, state.workingDirectory);
   }, [pendingToolPart, state.workingDirectory]);
 
@@ -594,6 +594,7 @@ function AppContent({ options }: AppProps) {
           toolCommand={approvalInfo.toolCommand}
           toolDescription={approvalInfo.toolDescription}
           dontAskAgainPattern={approvalInfo.dontAskAgainPattern}
+          ruleCandidate={approvalInfo.ruleCandidate}
         />
       ) : (
         <>
