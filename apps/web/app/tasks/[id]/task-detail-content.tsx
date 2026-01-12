@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isToolUIPart } from "ai";
 import type { ComponentProps, ReactNode } from "react";
@@ -13,6 +13,7 @@ import {
   ArrowUp,
   Square,
   X,
+  RotateCcw,
   Archive,
   Share2,
   GitPullRequest,
@@ -99,11 +100,15 @@ function formatTimeRemaining(ms: number): string {
 function SandboxStatus({
   sandboxInfo,
   isCreating,
+  isRestoring,
   onKill,
+  onStartNew,
 }: {
   sandboxInfo: SandboxInfo | null;
   isCreating: boolean;
+  isRestoring: boolean;
   onKill: () => void;
+  onStartNew: () => void;
 }) {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
@@ -126,14 +131,32 @@ function SandboxStatus({
 
   if (isCreating) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
-        <span>Creating sandbox...</span>
+      <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
+          <span>{isRestoring ? "Restoring workspace..." : "Creating sandbox..."}</span>
+        </div>
       </div>
     );
   }
 
-  if (!sandboxInfo || timeRemaining === null) {
+  if (!sandboxInfo) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+        <span>Sandbox stopped</span>
+        <button
+          type="button"
+          onClick={onStartNew}
+          className="rounded px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted-foreground/20"
+        >
+          Start sandbox
+        </button>
+      </div>
+    );
+  }
+
+  if (timeRemaining === null) {
     return null;
   }
 
@@ -142,22 +165,53 @@ function SandboxStatus({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-red-500" />
         <span>Sandbox expired</span>
+        <button
+          type="button"
+          onClick={onStartNew}
+          className="rounded px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted-foreground/20"
+        >
+          New sandbox
+        </button>
       </div>
     );
   }
 
+  const restoreWarning =
+    sandboxInfo.stateRestored === false
+      ? sandboxInfo.stateRestoreError ?? "Restore incomplete"
+      : null;
+
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span className="h-2 w-2 rounded-full bg-green-500" />
-      <span>{formatTimeRemaining(timeRemaining)}</span>
-      <button
-        type="button"
-        onClick={onKill}
-        className="rounded p-0.5 hover:bg-muted-foreground/20"
-        title="Stop sandbox"
-      >
-        <X className="h-3 w-3" />
-      </button>
+    <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        <span>{formatTimeRemaining(timeRemaining)}</span>
+        <button
+          type="button"
+          onClick={onKill}
+          className="rounded p-0.5 hover:bg-muted-foreground/20"
+          title="Stop sandbox"
+        >
+          <X className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={onStartNew}
+          className="rounded p-0.5 hover:bg-muted-foreground/20"
+          title="Start new sandbox"
+        >
+          <RotateCcw className="h-3 w-3" />
+        </button>
+      </div>
+      {restoreWarning && (
+        <div
+          className="flex items-center gap-1 text-[11px] text-amber-500"
+          title={restoreWarning}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <span>Restore incomplete</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -173,6 +227,7 @@ export function TaskDetailContent() {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [isCreatingSandbox, setIsCreatingSandbox] = useState(false);
+  const [isRestoringSandbox, setIsRestoringSandbox] = useState(false);
   const [prDialogOpen, setPrDialogOpen] = useState(false);
   const [repoDialogOpen, setRepoDialogOpen] = useState(false);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
@@ -185,6 +240,7 @@ export function TaskDetailContent() {
     sandboxInfo,
     setSandboxInfo,
     clearSandboxInfo,
+    setTaskSandboxId,
     archiveTask,
     hadInitialMessages,
     diffRefreshKey,
@@ -215,6 +271,82 @@ export function TaskDetailContent() {
     }
   };
 
+  const createSandboxForTask = useCallback(
+    async (options?: { showRestoreIndicator?: boolean }) => {
+      const shouldRestore = options?.showRestoreIndicator ?? false;
+      setIsCreatingSandbox(true);
+      setIsRestoringSandbox(shouldRestore);
+
+      try {
+        // Only create new branch on first sandbox creation
+        // If task already has a sandboxId, branch was already created
+        const shouldCreateNewBranch = task.isNewBranch && !task.sandboxId;
+        const existingSandboxId =
+          sandboxInfo?.sandboxId ?? task.sandboxId ?? undefined;
+        const newSandbox = await createSandbox(
+          task.cloneUrl ?? undefined,
+          task.branch ?? undefined,
+          shouldCreateNewBranch,
+          task.id,
+          existingSandboxId,
+        );
+        setSandboxInfo(newSandbox);
+        setTaskSandboxId(newSandbox.sandboxId);
+        return newSandbox;
+      } finally {
+        setIsCreatingSandbox(false);
+        setIsRestoringSandbox(false);
+      }
+    },
+    [
+      sandboxInfo?.sandboxId,
+      setSandboxInfo,
+      setTaskSandboxId,
+      task.branch,
+      task.cloneUrl,
+      task.id,
+      task.isNewBranch,
+      task.sandboxId,
+    ],
+  );
+
+  const handleStartNewSandbox = useCallback(async () => {
+    if (isCreatingSandbox) return;
+
+    const shouldRestore = hadInitialMessages || messages.length > 0;
+
+    if (sandboxInfo) {
+      try {
+        await fetch("/api/sandbox", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sandboxId: sandboxInfo.sandboxId,
+            taskId: task.id,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to stop sandbox:", error);
+      } finally {
+        clearSandboxInfo();
+      }
+    }
+
+    try {
+      await createSandboxForTask({ showRestoreIndicator: shouldRestore });
+    } catch (error) {
+      console.error("Failed to create sandbox:", error);
+    }
+  }, [
+    clearSandboxInfo,
+    createSandboxForTask,
+    hadInitialMessages,
+    isCreatingSandbox,
+    messages.length,
+    sandboxInfo,
+    task.id,
+  ]);
+
   useEffect(() => {
     if (isAtBottom) {
       scrollToBottom();
@@ -236,25 +368,14 @@ export function TaskDetailContent() {
 
       // Create sandbox and send first message
       const initTask = async () => {
-        // Always create a sandbox - either with repo or empty
-        setIsCreatingSandbox(true);
         try {
-          // Only create new branch on first sandbox creation
-          // If task already has a sandboxId, branch was already created
-          const shouldCreateNewBranch = task.isNewBranch && !task.sandboxId;
-          const newSandbox = await createSandbox(
-            task.cloneUrl ?? undefined,
-            task.branch ?? undefined,
-            shouldCreateNewBranch,
-            task.id,
-            task.sandboxId ?? undefined,
-          );
-          setSandboxInfo(newSandbox);
+          // Always create a sandbox - either with repo or empty
+          await createSandboxForTask({
+            showRestoreIndicator: hadInitialMessages,
+          });
         } catch (err) {
           console.error("Failed to create sandbox:", err);
           return;
-        } finally {
-          setIsCreatingSandbox(false);
         }
 
         // Send initial message for all tasks (with or without repo)
@@ -266,13 +387,14 @@ export function TaskDetailContent() {
   }, [
     messages.length,
     sendMessage,
-    setSandboxInfo,
+    createSandboxForTask,
     task.id,
     task.cloneUrl,
     task.branch,
     task.isNewBranch,
     task.sandboxId,
     task.title,
+    hadInitialMessages,
   ]);
 
   // Track tool completions to trigger diff refresh
@@ -603,7 +725,9 @@ export function TaskDetailContent() {
               <SandboxStatus
                 sandboxInfo={sandboxInfo}
                 isCreating={isCreatingSandbox}
+                isRestoring={isRestoringSandbox}
                 onKill={handleKillSandbox}
+                onStartNew={handleStartNewSandbox}
               />
             </div>
             <form
@@ -616,25 +740,13 @@ export function TaskDetailContent() {
 
                 // Recreate sandbox if expired
                 if (!isSandboxValid(sandboxInfo)) {
-                  setIsCreatingSandbox(true);
                   try {
-                    // Only create new branch on first sandbox creation
-                    // If task already has a sandboxId, branch was already created
-                    const shouldCreateNewBranch =
-                      task.isNewBranch && !task.sandboxId;
-                    const newSandbox = await createSandbox(
-                      task.cloneUrl ?? undefined,
-                      task.branch ?? undefined,
-                      shouldCreateNewBranch,
-                      task.id,
-                      task.sandboxId ?? undefined,
-                    );
-                    setSandboxInfo(newSandbox);
+                    await createSandboxForTask({
+                      showRestoreIndicator: true,
+                    });
                   } catch {
                     setInput(messageText);
                     return;
-                  } finally {
-                    setIsCreatingSandbox(false);
                   }
                 }
 
