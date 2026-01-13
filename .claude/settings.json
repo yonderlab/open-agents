@@ -15,7 +15,8 @@
       "Bash(tree:*)",
       "Bash(cat:*)",
       "Bash(jq:*)",
-      "Bash(python3 -c:*)"
+      "Bash(python3 -c:*)",
+      "Bash(git commit:*)"
     ]
   },
   "hooks": {
