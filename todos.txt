@@ -31,10 +31,15 @@
 - [ ] explore a tool registry that uses provider defined tools when available...
 - [ ] explore tool registry (server-side) that switches to provider-defined tools when available
 - [ ] add slash commands
+ -  I want to add support for slash commands in the CLI, or the TUI. I have attached two images that show exactly how they should work, but when you hit slash, it should show the
+  similar suggestions UI for autocompleting and navigating through slash commands, and then when you click one, it should open a settings panel to set that specific setting.
 - [ ] add ability to alt arrow between input box
 - [ ] interrupt conversation (stop) if no reason is passed to approval request 
 - [x] diff viewer shouldn't show diff if creating file! 
 - [ ] add askUserQuestion tool!
+
+- [ ] audit call options
+- [ ] add ability to save settings per project / or per user (~/.settings)
 
 - [ ] introduce concept of user approval and machine approval
   - there are things that should have an auto approve / reject
