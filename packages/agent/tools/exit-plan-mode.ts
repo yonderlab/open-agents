@@ -145,7 +145,9 @@ export function isExitPlanModeOutput(
 }
 
 /**
- * Extract the actual output value from a potentially wrapped tool result.
+ * Extract a successful exit_plan_mode output from a potentially wrapped tool result.
+ * Returns null if the output is not present, invalid, or indicates failure (success !== true).
+ * This ensures mode transitions only occur when the tool execution succeeded.
  */
 export function extractExitPlanModeOutput(
   value: unknown,

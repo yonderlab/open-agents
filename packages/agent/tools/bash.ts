@@ -242,12 +242,12 @@ EXAMPLES:
 
       // In plan mode, only allow read-only commands
       if (agentMode === "plan" && !isReadOnlyCommand(command)) {
+        const allowedPrefixes = SAFE_COMMAND_PREFIXES.join(", ");
         return {
           success: false,
           exitCode: 1,
           stdout: "",
-          stderr:
-            "In plan mode, only read-only commands are allowed. Use exit_plan_mode to switch to default mode and run this command.",
+          stderr: `This command is not allowed in plan mode. Allowed command prefixes: ${allowedPrefixes}. If you really need to run this command, use exit_plan_mode first.`,
         };
       }
 

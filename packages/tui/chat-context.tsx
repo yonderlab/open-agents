@@ -331,7 +331,7 @@ export function ChatProvider({
     ],
   );
 
-  const cyclePermissionMode = useCallback(async () => {
+  const cyclePermissionMode = useCallback(() => {
     const prev = permissionModeRef.current;
     const currentIndex = PERMISSION_MODES.indexOf(prev);
     const nextIndex = (currentIndex + 1) % PERMISSION_MODES.length;
@@ -352,8 +352,11 @@ export function ChatProvider({
       planFilePathRef.current = newPlanFilePath;
       setPlanFilePath(newPlanFilePath);
 
-      // Create the directory in the background - don't block mode switching
-      await sandbox.mkdir(plansDir, { recursive: true });
+      // Fire-and-forget: create directory in background
+      // The mode is already set; this just ensures the dir exists before agent writes
+      sandbox.mkdir(plansDir, { recursive: true }).catch(() => {
+        // Ignore errors - will be caught when agent tries to write
+      });
     } else if (prev === "plan") {
       // Exiting plan mode, clear plan file path
       planFilePathRef.current = null;

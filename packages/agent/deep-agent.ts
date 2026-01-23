@@ -119,9 +119,18 @@ export const deepAgent = new ToolLoopAgent({
     // Steps contain tool results from this request's execution
     // Messages contain tool results from approval responses (including denials)
 
-    // First pass: collect all denied tool IDs and their reasons from tool messages
+    // Only check recent messages for denied tools.
+    // We look at the last 3 messages to capture the typical denial flow:
+    // [assistant with tool-call] -> [tool with denial result] -> [user feedback]
+    //
+    // Why 3? Denials from earlier turns are stale and not relevant to current processing.
+    // If this number is too small, we may miss denials when multiple tool calls happen
+    // in quick succession. If too large, we may incorrectly detect old denials as current.
+    const RECENT_MESSAGE_WINDOW = 3;
+    const recentMessages = messages.slice(-RECENT_MESSAGE_WINDOW);
     const deniedTools = new Map<string, string | undefined>();
-    for (const message of messages) {
+
+    for (const message of recentMessages) {
       if (message.role === "tool" && Array.isArray(message.content)) {
         for (const part of message.content) {
           if (
@@ -139,10 +148,10 @@ export const deepAgent = new ToolLoopAgent({
       }
     }
 
-    // Second pass: check if exit_plan_mode was denied
+    // Check if exit_plan_mode was denied in recent messages
     let exitPlanModeDenied = false;
     let exitPlanModeDenialReason: string | undefined;
-    for (const message of messages) {
+    for (const message of recentMessages) {
       if (message.role === "assistant" && Array.isArray(message.content)) {
         for (const part of message.content) {
           if (

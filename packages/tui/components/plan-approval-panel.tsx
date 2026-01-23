@@ -39,9 +39,6 @@ export function PlanApprovalPanel({
     return renderMarkdown(plan);
   }, [plan]);
 
-  // Extract just the filename from the path for display
-  const planName = planFilePath.split("/").pop()?.replace(".md", "") ?? "";
-
   // Options:
   // 0: Yes, clear context and auto-accept edits (shift+tab)
   // 1: Yes, auto-accept edits
@@ -210,9 +207,7 @@ export function PlanApprovalPanel({
 
       {/* Footer hint */}
       <Box marginTop={1}>
-        <Text color="gray">
-          ctrl-g to edit in Nvim · ~/.config/open-harness/plans/{planName}.md
-        </Text>
+        <Text color="gray">ctrl-g to edit in Nvim · {planFilePath}</Text>
       </Box>
     </Box>
   );
