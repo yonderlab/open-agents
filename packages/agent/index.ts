@@ -11,6 +11,7 @@ export type {
   TodoStatus,
   ApprovalConfig,
   ApprovalRule,
+  AgentMode,
 } from "./types";
 export { DEEP_AGENT_SYSTEM_PROMPT, buildSystemPrompt } from "./system-prompt";
 export type { BuildSystemPromptOptions } from "./system-prompt";
@@ -28,6 +29,11 @@ export {
   type AskUserQuestionInput,
   type AskUserQuestionOutput,
 } from "./tools/ask-user-question";
+export { type EnterPlanModeOutput } from "./tools/enter-plan-mode";
+export {
+  type ExitPlanModeOutput,
+  type ExitPlanModeInput,
+} from "./tools/exit-plan-mode";
 
 // Subagent type exports
 export type {

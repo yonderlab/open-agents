@@ -13,6 +13,7 @@ import type {
   AutoAcceptMode,
   ApprovalRule,
 } from "./types";
+import type { AgentMode } from "@open-harness/agent";
 import type { Settings } from "./lib/settings";
 import { getModelById } from "./lib/models";
 import { createSession, saveSession } from "./lib/session-storage";
@@ -30,7 +31,10 @@ export type AgentTransportOptions = {
   getAutoApprove?: () => AutoAcceptMode;
   getApprovalRules?: () => ApprovalRule[];
   getSettings?: () => Settings;
+  getAgentMode?: () => AgentMode;
+  getPlanFilePath?: () => string | null;
   onUsageUpdate?: (usage: LanguageModelUsage) => void;
+  onAgentModeChange?: (mode: AgentMode, planFilePath?: string) => void;
   persistence?: PersistenceConfig;
 };
 
@@ -40,7 +44,11 @@ export function createAgentTransport({
   getAutoApprove,
   getApprovalRules,
   getSettings,
+  getAgentMode,
+  getPlanFilePath,
   onUsageUpdate,
+  // TODO: Implement mode change handling when enter_plan_mode/exit_plan_mode results are processed
+  onAgentModeChange: _onAgentModeChange,
   persistence,
 }: AgentTransportOptions): ChatTransport<TUIAgentUIMessage> {
   return {
@@ -65,6 +73,8 @@ export function createAgentTransport({
       const model = settings.modelId
         ? getModelById(settings.modelId, { devtools: true })
         : undefined;
+      const agentMode = getAgentMode?.() ?? "default";
+      const planFilePath = getPlanFilePath?.() ?? undefined;
 
       // Build the approval config based on the current base config type
       const baseApproval = agentOptions.approval;
@@ -87,7 +97,13 @@ export function createAgentTransport({
 
       const result = await agent.stream({
         messages: prunedMessages,
-        options: { ...agentOptions, ...(model && { model }), approval },
+        options: {
+          ...agentOptions,
+          ...(model && { model }),
+          approval,
+          agentMode,
+          planFilePath,
+        },
         abortSignal: abortSignal ?? undefined,
         experimental_transform: smoothStream(),
       });

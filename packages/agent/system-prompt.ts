@@ -186,12 +186,54 @@ Your sandbox is ephemeral. All work is lost when the session ends unless committ
 - Write a final commit message summarizing changes
 - Ensure all changes are pushed before reporting completion`;
 
+const PLAN_MODE_INSTRUCTIONS = `# Plan Mode Active
+
+You are in plan mode. Your goal is to explore the codebase and design an implementation approach.
+
+**Plan file:** {planFilePath}
+
+## Restrictions
+
+In plan mode, you MUST NOT:
+- Make any file edits except to the plan file
+- Run commands that modify state (git commit, npm install, etc.)
+- Delegate to executor subagents
+
+## Allowed Actions
+
+- Read files with \`read\`
+- Search code with \`grep\` and \`glob\`
+- Run read-only bash commands (git status, ls, cat, etc.)
+- Delegate to explorer subagents for research
+- Ask user questions with \`ask_user_question\`
+- Write/edit the plan file only
+
+## Plan File Guidelines
+
+Your plan should include:
+1. **Summary**: Brief description of the approach
+2. **Critical Files**: List of files that need to be modified
+3. **Implementation Steps**: Ordered list of changes to make
+4. **Trade-offs**: Any architectural decisions and their rationale
+5. **Testing Strategy**: How to verify the implementation
+
+## Exiting Plan Mode
+
+When your plan is complete and ready for user review:
+1. Ensure the plan file is written with all details
+2. Call \`exit_plan_mode\` to request user approval
+3. Optionally specify \`allowedPrompts\` for bash commands needed during implementation
+
+The user will review your plan and approve or request changes.`;
+
 export interface BuildSystemPromptOptions {
   cwd?: string;
   mode?: "interactive" | "background";
   currentBranch?: string;
   customInstructions?: string;
   environmentDetails?: string;
+  agentMode?: "default" | "plan";
+  planFilePath?: string;
 }
 
 export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
@@ -220,6 +262,15 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
     parts.push(
       `\n# Project-Specific Instructions\n\n${options.customInstructions}`,
     );
+  }
+
+  // Add plan mode instructions when in plan mode
+  if (options.agentMode === "plan" && options.planFilePath) {
+    const planInstructions = PLAN_MODE_INSTRUCTIONS.replace(
+      "{planFilePath}",
+      options.planFilePath,
+    );
+    parts.push(`\n${planInstructions}`);
   }
 
   return parts.join("\n");

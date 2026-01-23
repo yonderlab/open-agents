@@ -91,6 +91,9 @@ export function renderToolPart(
           isExpanded={isExpanded}
         />
       );
+    case "tool-enter_plan_mode":
+    case "tool-exit_plan_mode":
+      return <DefaultRenderer part={part} state={state} />;
     case "dynamic-tool":
       return <DefaultRenderer part={part} state={state} />;
   }

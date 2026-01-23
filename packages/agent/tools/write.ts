@@ -2,8 +2,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import * as path from "path";
 import {
-  getSandbox,
   getApprovalContext,
+  getAgentContext,
   shouldAutoApprove,
   pathNeedsApproval,
 } from "./utils";
@@ -76,14 +76,26 @@ EXAMPLES:
 - Replace a script after reading it: filePath: "/Users/username/project/scripts/build.sh", content: "<entire updated script>"`,
     inputSchema: writeInputSchema,
     execute: async ({ filePath, content }, { experimental_context }) => {
-      const sandbox = getSandbox(experimental_context, "write");
+      const { sandbox, agentMode, planFilePath } = getAgentContext(
+        experimental_context,
+        "write",
+      );
       const workingDirectory = sandbox.workingDirectory;
 
-      try {
-        const absolutePath = path.isAbsolute(filePath)
-          ? filePath
-          : path.resolve(workingDirectory, filePath);
+      // Resolve the path first for comparison
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(workingDirectory, filePath);
 
+      // In plan mode, only allow writes to the plan file
+      if (agentMode === "plan" && absolutePath !== planFilePath) {
+        return {
+          success: false,
+          error: `In plan mode, you can only write to the plan file: ${planFilePath}. Use exit_plan_mode to switch to default mode.`,
+        };
+      }
+
+      try {
         const dir = path.dirname(absolutePath);
         await sandbox.mkdir(dir, { recursive: true });
         await sandbox.writeFile(absolutePath, content, "utf-8");
@@ -156,8 +168,24 @@ EXAMPLES:
       { filePath, oldString, newString, replaceAll = false },
       { experimental_context },
     ) => {
-      const sandbox = getSandbox(experimental_context, "edit");
+      const { sandbox, agentMode, planFilePath } = getAgentContext(
+        experimental_context,
+        "edit",
+      );
       const workingDirectory = sandbox.workingDirectory;
+
+      // Resolve the path first for comparison
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(workingDirectory, filePath);
+
+      // In plan mode, only allow edits to the plan file
+      if (agentMode === "plan" && absolutePath !== planFilePath) {
+        return {
+          success: false,
+          error: `In plan mode, you can only edit the plan file: ${planFilePath}. Use exit_plan_mode to switch to default mode.`,
+        };
+      }
 
       try {
         if (oldString === newString) {
@@ -166,10 +194,6 @@ EXAMPLES:
             error: "oldString and newString must be different",
           };
         }
-
-        const absolutePath = path.isAbsolute(filePath)
-          ? filePath
-          : path.resolve(workingDirectory, filePath);
 
         const content = await sandbox.readFile(absolutePath, "utf-8");
 

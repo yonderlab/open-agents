@@ -8,7 +8,11 @@ import { z } from "zod";
 import { explorerSubagent } from "../subagents/explorer";
 import { executorSubagent } from "../subagents/executor";
 import type { SubagentUIMessage } from "../subagents/types";
-import { getSandbox, getApprovalContext, shouldAutoApprove } from "./utils";
+import {
+  getApprovalContext,
+  getAgentContext,
+  shouldAutoApprove,
+} from "./utils";
 import type { ApprovalRule } from "../types";
 
 const subagentTypeSchema = z.enum(["explorer", "executor"]);
@@ -125,7 +129,19 @@ NOTE: The executor subagent requires user approval before running because it has
     { subagentType, task, instructions },
     { experimental_context, abortSignal },
   ) {
-    const sandbox = getSandbox(experimental_context, "task");
+    const { sandbox, agentMode } = getAgentContext(
+      experimental_context,
+      "task",
+    );
+
+    // In plan mode, only explorer subagent is allowed
+    if (agentMode === "plan" && subagentType !== "explorer") {
+      return {
+        type: "text" as const,
+        value:
+          "In plan mode, only the explorer subagent is allowed. Use exit_plan_mode to switch to default mode and use executor.",
+      };
+    }
 
     const subagent =
       subagentType === "explorer" ? explorerSubagent : executorSubagent;

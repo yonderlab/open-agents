@@ -17,6 +17,7 @@ import type {
   AutoAcceptMode,
   ApprovalRule,
 } from "./types";
+import type { AgentMode } from "@open-harness/agent";
 import type { Settings } from "./lib/settings";
 import { AVAILABLE_MODELS, type ModelInfo } from "./lib/models";
 import { getContextLimit } from "@open-harness/agent";
@@ -40,6 +41,8 @@ type ChatState = {
   sessionId: string | null;
   projectPath: string | null;
   currentBranch: string;
+  agentMode: AgentMode;
+  planFilePath: string | null;
 };
 
 type ChatContextValue = {
@@ -53,6 +56,7 @@ type ChatContextValue = {
   openPanel: (panel: PanelState) => void;
   closePanel: () => void;
   setSessionId: (sessionId: string | null) => void;
+  setAgentMode: (mode: AgentMode, planFilePath?: string) => void;
 };
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -195,6 +199,8 @@ export function ChatProvider({
   const [sessionId, setSessionId] = useState<string | null>(
     initialSessionId ?? null,
   );
+  const [agentMode, setAgentModeState] = useState<AgentMode>("default");
+  const [planFilePath, setPlanFilePath] = useState<string | null>(null);
 
   // Use refs to pass current values to transport without recreating it
   const autoAcceptModeRef = useRef(autoAcceptMode);
@@ -207,6 +213,10 @@ export function ChatProvider({
   sessionIdRef.current = sessionId;
   const currentBranchRef = useRef(currentBranch);
   currentBranchRef.current = currentBranch;
+  const agentModeRef = useRef(agentMode);
+  agentModeRef.current = agentMode;
+  const planFilePathRef = useRef(planFilePath);
+  planFilePathRef.current = planFilePath;
 
   // Use ref for initialMessages to avoid recreating chat when it changes
   const initialMessagesRef = useRef(initialMessages);
@@ -244,6 +254,11 @@ export function ChatProvider({
     setApprovalRules([]);
   }, []);
 
+  const setAgentMode = useCallback((mode: AgentMode, filePath?: string) => {
+    setAgentModeState(mode);
+    setPlanFilePath(filePath ?? null);
+  }, []);
+
   const transport = useMemo(
     () =>
       createAgentTransport({
@@ -252,7 +267,10 @@ export function ChatProvider({
         getAutoApprove: () => autoAcceptModeRef.current,
         getApprovalRules: () => approvalRulesRef.current,
         getSettings: () => settingsRef.current,
+        getAgentMode: () => agentModeRef.current,
+        getPlanFilePath: () => planFilePathRef.current,
         onUsageUpdate: handleUsageUpdate,
+        onAgentModeChange: setAgentMode,
         persistence: projectPath
           ? {
               getSessionId: () => sessionIdRef.current,
@@ -262,7 +280,7 @@ export function ChatProvider({
             }
           : undefined,
       }),
-    [agentOptions, handleUsageUpdate, projectPath],
+    [agentOptions, handleUsageUpdate, projectPath, setAgentMode],
   );
 
   const chat = useMemo(
@@ -290,6 +308,8 @@ export function ChatProvider({
       sessionId,
       projectPath: projectPath ?? null,
       currentBranch,
+      agentMode,
+      planFilePath,
     }),
     [
       effectiveModel,
@@ -305,6 +325,8 @@ export function ChatProvider({
       sessionId,
       projectPath,
       currentBranch,
+      agentMode,
+      planFilePath,
     ],
   );
 
@@ -348,6 +370,7 @@ export function ChatProvider({
         openPanel,
         closePanel,
         setSessionId,
+        setAgentMode,
       }}
     >
       {children}

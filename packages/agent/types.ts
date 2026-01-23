@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { Sandbox } from "@open-harness/sandbox";
 
+/**
+ * Agent operating mode.
+ * - "default": Full access to all tools
+ * - "plan": Restricted to read-only tools plus write access to a single plan file
+ */
+export type AgentMode = "default" | "plan";
+
 export const todoStatusSchema = z.enum(["pending", "in_progress", "completed"]);
 export type TodoStatus = z.infer<typeof todoStatusSchema>;
 
@@ -32,6 +39,8 @@ export type ApprovalConfig =
 export interface AgentContext {
   sandbox: Sandbox;
   approval: ApprovalConfig;
+  agentMode?: AgentMode;
+  planFilePath?: string;
 }
 
 /**

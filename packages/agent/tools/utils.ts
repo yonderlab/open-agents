@@ -1,5 +1,10 @@
 import * as path from "path";
-import type { AgentContext, ApprovalConfig, ApprovalRule } from "../types";
+import type {
+  AgentContext,
+  AgentMode,
+  ApprovalConfig,
+  ApprovalRule,
+} from "../types";
 import type { Sandbox } from "@open-harness/sandbox";
 import type { ModelMessage } from "ai";
 
@@ -104,6 +109,52 @@ export function getApprovalContext(
     sandbox: context.sandbox,
     workingDirectory: context.sandbox.workingDirectory,
     approval: context.approval ?? defaultApproval,
+  };
+}
+
+/**
+ * Get the full agent context from experimental_context.
+ * Used by tool execute functions to access mode and plan file path.
+ *
+ * @param experimental_context - The context passed to tool execute functions
+ * @param toolName - Optional tool name for better error messages
+ * @returns Object with sandbox, approval, agentMode, and planFilePath
+ */
+export function getAgentContext(
+  experimental_context: unknown,
+  toolName?: string,
+): {
+  sandbox: Sandbox;
+  workingDirectory: string;
+  approval: ApprovalConfig;
+  agentMode: AgentMode;
+  planFilePath: string | undefined;
+} {
+  const context = experimental_context as AgentContext | undefined;
+  if (!context?.sandbox) {
+    const toolInfo = toolName ? ` (tool: ${toolName})` : "";
+    const contextInfo = context
+      ? `Context exists but sandbox is missing. Context keys: ${Object.keys(context).join(", ")}`
+      : "Context is undefined or null";
+    throw new Error(
+      `Agent context not initialized${toolInfo}. ${contextInfo}. ` +
+        "Ensure the agent's prepareCall sets experimental_context: { sandbox, ... }",
+    );
+  }
+
+  // Default to interactive mode with no auto-approve if approval config is missing
+  const defaultApproval: ApprovalConfig = {
+    type: "interactive",
+    autoApprove: "off",
+    sessionRules: [],
+  };
+
+  return {
+    sandbox: context.sandbox,
+    workingDirectory: context.sandbox.workingDirectory,
+    approval: context.approval ?? defaultApproval,
+    agentMode: context.agentMode ?? "default",
+    planFilePath: context.planFilePath,
   };
 }
 

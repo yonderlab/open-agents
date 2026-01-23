@@ -3,8 +3,8 @@ import { z } from "zod";
 import * as path from "path";
 import {
   isPathWithinDirectory,
-  getSandbox,
   getApprovalContext,
+  getAgentContext,
   shouldAutoApprove,
 } from "./utils";
 import type { ApprovalRule } from "../types";
@@ -108,6 +108,31 @@ const DANGEROUS_COMMAND_PATTERNS = [
 ];
 
 /**
+ * Check if a command is read-only (safe for plan mode).
+ * Returns true if the command only reads data and doesn't modify state.
+ */
+export function isReadOnlyCommand(command: string): boolean {
+  const trimmedCommand = command.trim();
+
+  // Check for dangerous patterns first - these are never read-only
+  for (const pattern of DANGEROUS_COMMAND_PATTERNS) {
+    if (pattern.test(trimmedCommand)) {
+      return false;
+    }
+  }
+
+  // Check if it starts with a safe command
+  for (const prefix of SAFE_COMMAND_PREFIXES) {
+    if (trimmedCommand.startsWith(prefix)) {
+      return true;
+    }
+  }
+
+  // Unknown commands are not considered read-only
+  return false;
+}
+
+/**
  * Check if a command is safe to run without approval.
  * Returns true if approval is needed, false if safe.
  */
@@ -209,8 +234,22 @@ EXAMPLES:
 - List files in src: command: "ls -la", cwd: "/Users/username/project/src"`,
     inputSchema: bashInputSchema,
     execute: async ({ command, cwd }, { experimental_context }) => {
-      const sandbox = getSandbox(experimental_context, "bash");
+      const { sandbox, agentMode } = getAgentContext(
+        experimental_context,
+        "bash",
+      );
       const workingDirectory = sandbox.workingDirectory;
+
+      // In plan mode, only allow read-only commands
+      if (agentMode === "plan" && !isReadOnlyCommand(command)) {
+        return {
+          success: false,
+          exitCode: 1,
+          stdout: "",
+          stderr:
+            "In plan mode, only read-only commands are allowed. Use exit_plan_mode to switch to default mode and run this command.",
+        };
+      }
 
       // Resolve the working directory
       const workingDir = cwd

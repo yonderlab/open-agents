@@ -17,9 +17,11 @@ import {
   bashTool,
   taskTool,
   askUserQuestionTool,
+  enterPlanModeTool,
+  exitPlanModeTool,
 } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
-import type { TodoItem, ApprovalConfig } from "./types";
+import type { TodoItem, ApprovalConfig, AgentMode } from "./types";
 import { approvalRuleSchema } from "./types";
 import { addCacheControl, compactContext } from "./context-management";
 import type { Sandbox } from "@open-harness/sandbox";
@@ -34,11 +36,15 @@ const approvalConfigSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delegated") }),
 ]);
 
+const agentModeSchema = z.enum(["default", "plan"]).default("default");
+
 const callOptionsSchema = z.object({
   sandbox: z.custom<Sandbox>(),
   approval: approvalConfigSchema,
   model: z.custom<LanguageModel>().optional(),
   customInstructions: z.string().optional(),
+  agentMode: agentModeSchema.optional(),
+  planFilePath: z.string().optional(),
 });
 
 export type DeepAgentCallOptions = z.infer<typeof callOptionsSchema>;
@@ -56,7 +62,35 @@ const tools = {
   bash: bashTool(),
   task: taskTool,
   ask_user_question: askUserQuestionTool,
+  enter_plan_mode: enterPlanModeTool(),
+  exit_plan_mode: exitPlanModeTool(),
 } satisfies ToolSet;
+
+// Tool sets by mode - defines which tools are available in each mode
+const DEFAULT_MODE_TOOLS = [
+  "todo_write",
+  "read",
+  "write",
+  "edit",
+  "grep",
+  "glob",
+  "bash",
+  "task",
+  "ask_user_question",
+  "enter_plan_mode",
+] as const;
+
+const PLAN_MODE_TOOLS = [
+  "read",
+  "grep",
+  "glob",
+  "bash",
+  "task",
+  "ask_user_question",
+  "write",
+  "edit",
+  "exit_plan_mode",
+] as const;
 
 export const deepAgent = new ToolLoopAgent({
   model: defaultModel,
@@ -80,6 +114,8 @@ export const deepAgent = new ToolLoopAgent({
     const callModel = options.model ?? model;
     const customInstructions = options.customInstructions;
     const sandbox = options.sandbox;
+    const agentMode: AgentMode = options.agentMode ?? "default";
+    const planFilePath = options.planFilePath;
 
     // Derive mode for system prompt (interactive vs background)
     const mode = approval.type === "background" ? "background" : "interactive";
@@ -90,7 +126,13 @@ export const deepAgent = new ToolLoopAgent({
       currentBranch: sandbox.currentBranch,
       customInstructions,
       environmentDetails: sandbox.environmentDetails,
+      agentMode,
+      planFilePath,
     });
+
+    // Select which tools are active based on agent mode
+    const activeToolNames =
+      agentMode === "plan" ? PLAN_MODE_TOOLS : DEFAULT_MODE_TOOLS;
 
     return {
       ...settings,
@@ -99,8 +141,9 @@ export const deepAgent = new ToolLoopAgent({
         tools: settings.tools ?? tools,
         model: callModel,
       }),
+      activeTools: [...activeToolNames],
       instructions,
-      experimental_context: { sandbox, approval },
+      experimental_context: { sandbox, approval, agentMode, planFilePath },
     };
   },
 });
