@@ -627,28 +627,62 @@ function AppContent({ options }: AppProps) {
     }, [messages]);
 
   // Detect pending exit_plan_mode approval for custom plan approval panel
-  const { hasPendingPlanApproval, planApprovalId } = useMemo(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === "assistant") {
-      for (const p of lastMessage.parts) {
-        if (
-          isToolUIPart(p) &&
-          p.type === "tool-exit_plan_mode" &&
-          p.state === "approval-requested"
-        ) {
-          const approval = (p as { approval?: { id: string } }).approval;
-          return {
-            hasPendingPlanApproval: true,
-            planApprovalId: approval?.id ?? null,
-          };
+  const { hasPendingPlanApproval, planApprovalId, planFilePath } =
+    useMemo(() => {
+      // First, check if there's a pending exit_plan_mode in the last message
+      const lastMessage = messages[messages.length - 1];
+      let pendingApproval: { id: string } | undefined;
+
+      if (lastMessage?.role === "assistant") {
+        for (const p of lastMessage.parts) {
+          if (
+            isToolUIPart(p) &&
+            p.type === "tool-exit_plan_mode" &&
+            p.state === "approval-requested"
+          ) {
+            pendingApproval = (p as { approval?: { id: string } }).approval;
+            break;
+          }
         }
       }
-    }
-    return {
-      hasPendingPlanApproval: false,
-      planApprovalId: null,
-    };
-  }, [messages]);
+
+      // No pending exit_plan_mode - return early (common case, fast path)
+      if (!pendingApproval) {
+        return {
+          hasPendingPlanApproval: false,
+          planApprovalId: null,
+          planFilePath: null,
+        };
+      }
+
+      // Only scan history for enter_plan_mode when we have a pending exit_plan_mode
+      // This handles session resume where enter_plan_mode is in an earlier message
+      let extractedPlanFilePath: string | null = null;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (!msg || msg.role !== "assistant") continue;
+        for (const p of msg.parts) {
+          if (
+            isToolUIPart(p) &&
+            p.type === "tool-enter_plan_mode" &&
+            p.state === "output-available"
+          ) {
+            const output = extractEnterPlanModeOutput(p.output);
+            if (output?.planFilePath) {
+              extractedPlanFilePath = output.planFilePath;
+              break;
+            }
+          }
+        }
+        if (extractedPlanFilePath) break;
+      }
+
+      return {
+        hasPendingPlanApproval: true,
+        planApprovalId: pendingApproval.id ?? null,
+        planFilePath: extractedPlanFilePath,
+      };
+    }, [messages]);
 
   // Detect pending askUserQuestion tool calls
   const { hasPendingQuestion, pendingQuestionPart, questionToolCallId } =
@@ -921,10 +955,10 @@ function AppContent({ options }: AppProps) {
       state.activePanel.type === "none" &&
         hasPendingPlanApproval &&
         planApprovalId &&
-        state.planFilePath ? (
+        planFilePath ? (
         <PlanApprovalPanel
           approvalId={planApprovalId}
-          planFilePath={state.planFilePath}
+          planFilePath={planFilePath}
           onClearAndImplement={handleClearAndImplementPlan}
         />
       ) : /* Show approval panel when there's a pending approval (replaces status bar and input) */
