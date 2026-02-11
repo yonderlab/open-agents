@@ -497,6 +497,7 @@ export function SessionChatContent() {
     renameChat,
     deleteChat,
     markChatRead,
+    setChatStreaming,
     loading: chatsLoading,
     refreshChats,
   } = useSessionChats(session.id);
@@ -1880,6 +1881,7 @@ export function SessionChatContent() {
                   setInput("");
                   clearImages();
 
+                  void setChatStreaming(chatInfo.id, true);
                   sendMessage({ text: messageText, files });
                 }}
                 onDragOver={(e) => {

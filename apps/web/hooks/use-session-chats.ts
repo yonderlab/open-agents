@@ -142,6 +142,23 @@ export function useSessionChats(sessionId: string | null) {
     );
   };
 
+  const setChatStreaming = async (chatId: string, isStreaming: boolean) => {
+    await mutate(
+      (current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          chats: current.chats.map((chat) =>
+            chat.id === chatId ? { ...chat, isStreaming } : chat,
+          ),
+        };
+      },
+      { revalidate: false },
+    );
+  };
+
   return {
     chats,
     loading: isLoading,
@@ -150,6 +167,7 @@ export function useSessionChats(sessionId: string | null) {
     renameChat,
     deleteChat,
     markChatRead,
+    setChatStreaming,
     refreshChats: mutate,
   };
 }
