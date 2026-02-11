@@ -506,6 +506,7 @@ export function SessionChatContent() {
     markChatRead,
     setChatStreaming,
     setChatTitle,
+    clearChatTitle,
     loading: chatsLoading,
     refreshChats,
   } = useSessionChats(session.id);
@@ -516,6 +517,8 @@ export function SessionChatContent() {
   const chatTitleInputRef = useRef<HTMLInputElement | null>(null);
   const lastStatusSyncAtRef = useRef(0);
   const statusSyncInFlightRef = useRef(false);
+  const pendingOptimisticTitleChatIdRef = useRef<string | null>(null);
+  const hasSetOptimisticTitleRef = useRef(false);
   const markReadRef = useRef<{
     lastAt: number;
     lastChatId: string | null;
@@ -904,10 +907,19 @@ export function SessionChatContent() {
     const prevStatus = prevStatusRef.current;
     const wasStreaming = prevStatus === "streaming";
     const becameReady = status === "ready" && prevStatus !== "ready";
+    const becameError = status === "error" && prevStatus !== "error";
     const shouldClearStreaming = status === "error" || becameReady;
     prevStatusRef.current = status;
     if (shouldClearStreaming) {
       void setChatStreaming(chatInfo.id, false);
+    }
+    if (becameError && pendingOptimisticTitleChatIdRef.current) {
+      void clearChatTitle(pendingOptimisticTitleChatIdRef.current);
+      pendingOptimisticTitleChatIdRef.current = null;
+      hasSetOptimisticTitleRef.current = false;
+    }
+    if (becameReady) {
+      pendingOptimisticTitleChatIdRef.current = null;
     }
     if (wasStreaming && status === "ready") {
       void requestStatusSync("force");
@@ -918,6 +930,7 @@ export function SessionChatContent() {
     status,
     chatInfo.id,
     setChatStreaming,
+    clearChatTitle,
     requestStatusSync,
     requestMarkChatRead,
     refreshChats,
@@ -1905,18 +1918,32 @@ export function SessionChatContent() {
                   setInput("");
                   clearImages();
 
-                  if (!hadInitialMessages && chatInfo.title === "New chat") {
-                    const trimmedText = messageText.trim();
-                    if (trimmedText.length > 0) {
-                      const nextTitle =
-                        trimmedText.length > 30
-                          ? `${trimmedText.slice(0, 30)}...`
-                          : trimmedText;
-                      void setChatTitle(chatInfo.id, nextTitle);
-                    }
+                  const shouldSetOptimisticTitle =
+                    !hadInitialMessages && !hasSetOptimisticTitleRef.current;
+                  const trimmedText = messageText.trim();
+                  if (shouldSetOptimisticTitle && trimmedText.length > 0) {
+                    const nextTitle =
+                      trimmedText.length > 30
+                        ? `${trimmedText.slice(0, 30)}...`
+                        : trimmedText;
+                    hasSetOptimisticTitleRef.current = true;
+                    pendingOptimisticTitleChatIdRef.current = chatInfo.id;
+                    void setChatTitle(chatInfo.id, nextTitle);
                   }
                   void setChatStreaming(chatInfo.id, true);
-                  sendMessage({ text: messageText, files });
+                  try {
+                    await sendMessage({ text: messageText, files });
+                  } catch (err) {
+                    if (pendingOptimisticTitleChatIdRef.current) {
+                      void clearChatTitle(
+                        pendingOptimisticTitleChatIdRef.current,
+                      );
+                      pendingOptimisticTitleChatIdRef.current = null;
+                      hasSetOptimisticTitleRef.current = false;
+                    }
+                    void setChatStreaming(chatInfo.id, false);
+                    console.error("Failed to send message:", err);
+                  }
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();

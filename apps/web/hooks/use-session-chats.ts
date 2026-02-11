@@ -195,6 +195,18 @@ export function useSessionChats(sessionId: string | null) {
     setOptimisticTitles((current) => ({ ...current, [chatId]: title }));
   };
 
+  const clearChatTitle = async (chatId: string) => {
+    setOptimisticTitles((current) => {
+      if (!current[chatId]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[chatId];
+      return next;
+    });
+  };
+
   return {
     chats,
     loading: isLoading,
@@ -205,6 +217,7 @@ export function useSessionChats(sessionId: string | null) {
     markChatRead,
     setChatStreaming,
     setChatTitle,
+    clearChatTitle,
     refreshChats: mutate,
   };
 }
