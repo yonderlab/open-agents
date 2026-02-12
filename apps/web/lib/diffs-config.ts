@@ -1,4 +1,5 @@
 import type { BaseCodeOptions, BaseDiffOptions } from "@pierre/diffs/react";
+import "./vercel-themes";
 
 const unsafeCSS = `
   :host {
@@ -10,11 +11,20 @@ const unsafeCSS = `
     --diffs-tab-size: 2;
     --diffs-gap-inline: 8px;
     --diffs-gap-block: 0px;
+    --diffs-addition-color-override: #3dc96a;
+    --diffs-deletion-color-override: #f04b78;
+    --diffs-bg-addition-override: rgba(61, 201, 106, 0.12);
+    --diffs-bg-deletion-override: rgba(240, 75, 120, 0.12);
   }
 `;
 
+const theme = {
+  dark: "vercel-dark",
+  light: "vercel-light",
+} as const;
+
 export const defaultDiffOptions = {
-  theme: "github-dark",
+  theme,
   diffStyle: "unified",
   diffIndicators: "classic",
   overflow: "scroll",
@@ -28,7 +38,7 @@ export const splitDiffOptions = {
 } satisfies BaseDiffOptions;
 
 export const defaultFileOptions = {
-  theme: "github-dark",
+  theme,
   overflow: "scroll",
   disableFileHeader: true,
   unsafeCSS,

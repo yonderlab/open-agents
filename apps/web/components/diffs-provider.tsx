@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
+import "@/lib/vercel-themes";
 
 export function DiffsProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +14,10 @@ export function DiffsProvider({ children }: { children: React.ReactNode }) {
           ),
       }}
       highlighterOptions={{
-        theme: "github-dark",
+        theme: {
+          dark: "vercel-dark",
+          light: "vercel-light",
+        },
         langs: [],
       }}
     >
