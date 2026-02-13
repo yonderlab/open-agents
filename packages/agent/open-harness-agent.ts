@@ -59,6 +59,7 @@ const tools = {
   grep: grepTool(),
   glob: globTool(),
   bash: bashTool(),
+  // the name doesn't matter here as AI SDK transforms to anthropics required name
   bash_anthropic: anthropicBashTool(),
   task: taskTool,
   ask_user_question: askUserQuestionTool,
