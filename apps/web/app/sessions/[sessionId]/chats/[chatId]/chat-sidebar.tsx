@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 import type { SessionChatListItem } from "@/hooks/use-session-chats";
 
 type ChatSidebarProps = {
@@ -23,7 +24,6 @@ type ChatSidebarProps = {
   onCreateChat: () => void;
   onRenameChat: (chatId: string, title: string) => Promise<unknown>;
   onDeleteChat: (chatId: string) => Promise<unknown>;
-  onCloseMobileSidebar?: () => void;
 };
 
 export function ChatSidebar({
@@ -36,8 +36,8 @@ export function ChatSidebar({
   onCreateChat,
   onRenameChat,
   onDeleteChat,
-  onCloseMobileSidebar,
 }: ChatSidebarProps) {
+  const { isMobile, setOpenMobile } = useSidebar();
   const router = useRouter();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
@@ -153,7 +153,7 @@ export function ChatSidebar({
           variant="outline"
           size="sm"
           onClick={() => {
-            onCloseMobileSidebar?.();
+            if (isMobile) setOpenMobile(false);
             onCreateChat();
           }}
           disabled={chatsLoading}
@@ -194,7 +194,10 @@ export function ChatSidebar({
               ) : (
                 <button
                   type="button"
-                  onClick={() => onChatSwitch(c.id)}
+                  onClick={() => {
+                    if (isMobile) setOpenMobile(false);
+                    onChatSwitch(c.id);
+                  }}
                   className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 pr-10 text-left text-sm transition-colors ${
                     c.id === activeChatId
                       ? "text-secondary-foreground"

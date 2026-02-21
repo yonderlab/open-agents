@@ -15,7 +15,6 @@ import {
   GitPullRequest,
   Link2,
   Loader2,
-  Menu,
   Mic,
   Paperclip,
   RefreshCw,
@@ -75,7 +74,7 @@ import { useSessionChats } from "@/hooks/use-session-chats";
 import { ACCEPT_IMAGE_TYPES, isValidImageType } from "@/lib/image-utils";
 import { DEFAULT_SANDBOX_TIMEOUT_MS } from "@/lib/sandbox/config";
 import { cn } from "@/lib/utils";
-import { useSessionLayout } from "../../session-layout-context";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   type SandboxInfo,
   useSessionChatContext,
@@ -601,7 +600,6 @@ export function SessionChatContent() {
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const { openMobileSidebar } = useSessionLayout();
   const hasMounted = useHasMounted();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
@@ -1589,14 +1587,7 @@ export function SessionChatContent() {
       <header className="border-b border-border px-3 py-2 md:px-4 md:py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 md:gap-4">
-            {/* Menu button - mobile only */}
-            <button
-              type="button"
-              onClick={openMobileSidebar}
-              className="shrink-0 md:hidden"
-            >
-              <Menu className="h-4 w-4 text-muted-foreground" />
-            </button>
+            <SidebarTrigger className="shrink-0" />
             <div className="flex min-w-0 items-center gap-2 text-sm">
               {session.repoName ? (
                 <>

@@ -3,7 +3,6 @@
 import { createContext, useContext } from "react";
 
 type SessionLayoutContextValue = {
-  openMobileSidebar: () => void;
   session: {
     title: string;
     repoName: string | null;

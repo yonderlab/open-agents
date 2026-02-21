@@ -3,11 +3,11 @@
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Sidebar,
+  SidebarContent,
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
 import { useSessionChats } from "@/hooks/use-session-chats";
 import type { Session } from "@/lib/db/schema";
 import { ChatSidebar } from "./chats/[chatId]/chat-sidebar";
@@ -26,7 +26,6 @@ export function SessionLayoutShell({
   const params = useParams<{ sessionId: string; chatId?: string }>();
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sessionTitle, setSessionTitle] = useState(initialSession.title);
   const [optimisticActiveChatId, setOptimisticActiveChatId] = useState<
     string | null
@@ -77,7 +76,6 @@ export function SessionLayoutShell({
     (nextChatId: string) => {
       if (nextChatId === activeChatId) return;
       setOptimisticActiveChatId(nextChatId);
-      setMobileSidebarOpen(false);
       router.push(`/sessions/${sessionId}/chats/${nextChatId}`);
     },
     [router, sessionId, activeChatId],
@@ -140,13 +138,11 @@ export function SessionLayoutShell({
       onCreateChat={handleCreateChat}
       onRenameChat={renameChat}
       onDeleteChat={handleDeleteChat}
-      onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
     />
   );
 
   const layoutContext = useMemo(
     () => ({
-      openMobileSidebar: () => setMobileSidebarOpen(true),
       session: {
         title: initialSession.title,
         repoName: initialSession.repoName,
@@ -160,25 +156,23 @@ export function SessionLayoutShell({
 
   return (
     <SessionLayoutContext.Provider value={layoutContext}>
-      <div className="flex h-dvh overflow-hidden bg-background text-foreground">
-        {/* Desktop sidebar */}
-        <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-muted/20 md:flex">
-          {sidebarContent}
-        </aside>
-
-        {/* Mobile sidebar Drawer */}
-        <Drawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-          <DrawerContent className="h-[85dvh] md:hidden">
-            <DrawerHeader className="sr-only">
-              <DrawerTitle>Navigation</DrawerTitle>
-            </DrawerHeader>
+      <SidebarProvider
+        className="h-dvh overflow-hidden"
+        style={
+          {
+            "--sidebar-width": "18rem",
+          } as React.CSSProperties
+        }
+      >
+        <Sidebar collapsible="offcanvas" className="border-r border-border">
+          <SidebarContent className="bg-muted/20">
             {sidebarContent}
-          </DrawerContent>
-        </Drawer>
-
-        {/* Main content area */}
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      </div>
+          </SidebarContent>
+        </Sidebar>
+        <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </SidebarInset>
+      </SidebarProvider>
     </SessionLayoutContext.Provider>
   );
 }
