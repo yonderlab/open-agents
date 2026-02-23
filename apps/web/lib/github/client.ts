@@ -193,6 +193,56 @@ export async function getPullRequestStatus(params: {
   }
 }
 
+export async function findOpenPullRequest(params: {
+  repoUrl: string;
+  branchName: string;
+  token?: string;
+}): Promise<{
+  success: boolean;
+  prNumber?: number;
+  prUrl?: string;
+  error?: string;
+}> {
+  const { repoUrl, branchName, token } = params;
+
+  try {
+    const result = await getOctokit(token);
+
+    if (!result.authenticated) {
+      return { success: false, error: "GitHub account not connected" };
+    }
+
+    const parsed = parseGitHubUrl(repoUrl);
+    if (!parsed) {
+      return { success: false, error: "Invalid GitHub repository URL" };
+    }
+
+    const { owner, repo } = parsed;
+
+    const response = await result.octokit.rest.pulls.list({
+      owner,
+      repo,
+      head: `${owner}:${branchName}`,
+      state: "open",
+      per_page: 1,
+    });
+
+    if (response.data.length > 0) {
+      const pr = response.data[0]!;
+      return {
+        success: true,
+        prNumber: pr.number,
+        prUrl: pr.html_url,
+      };
+    }
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Error finding open PR:", error);
+    return { success: false, error: "Failed to search for pull requests" };
+  }
+}
+
 export async function createRepository(params: {
   name: string;
   description?: string;

@@ -127,7 +127,7 @@ export function CreatePRDialog({
     }
   }, [open]);
 
-  // Check git status when dialog opens
+  // Check git status when dialog opens, and look for existing PRs
   const checkGitStatus = useCallback(async () => {
     if (!hasSandbox) return;
     setIsCheckingStatus(true);
@@ -146,12 +146,34 @@ export function CreatePRDialog({
           setResolvedBranch(data.branch);
         }
       }
+
+      // Check for an existing PR on the current branch
+      const prRes = await fetch("/api/check-pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id }),
+      });
+      if (prRes.ok) {
+        const prData = (await prRes.json()) as {
+          prNumber?: number | null;
+          prStatus?: "open" | "merged" | "closed";
+        };
+        if (prData.prNumber && prData.prStatus) {
+          // Found an existing PR - notify parent and close dialog
+          onPrDetected?.({
+            prNumber: prData.prNumber,
+            prStatus: prData.prStatus,
+          });
+          onOpenChange(false);
+          return;
+        }
+      }
     } catch (err) {
       console.error("Failed to check git status:", err);
     } finally {
       setIsCheckingStatus(false);
     }
-  }, [hasSandbox, session.id]);
+  }, [hasSandbox, session.id, onPrDetected, onOpenChange]);
 
   useEffect(() => {
     if (open && hasSandbox) {

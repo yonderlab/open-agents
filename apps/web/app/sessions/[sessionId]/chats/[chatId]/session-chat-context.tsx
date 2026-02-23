@@ -701,6 +701,55 @@ export function SessionChatProvider({
     [mutate, sessionId],
   );
 
+  // Check for existing PRs and sync the live branch when the session has a repo
+  // but no known PR. This catches PRs created outside the dialog (e.g. by the agent).
+  const prCheckDoneRef = useRef(false);
+  useEffect(() => {
+    if (prCheckDoneRef.current) return;
+    // Only check when we have a repo but no PR recorded
+    if (!sessionRecord.cloneUrl || sessionRecord.prNumber) return;
+
+    prCheckDoneRef.current = true;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/check-pr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        if (!res.ok) return;
+
+        const data = (await res.json()) as {
+          branch?: string | null;
+          branchChanged?: boolean;
+          prNumber?: number | null;
+          prStatus?: "open" | "merged" | "closed";
+        };
+
+        // Sync branch if it changed in the sandbox
+        if (data.branchChanged && data.branch) {
+          setSessionRecord((prev) => ({ ...prev, branch: data.branch! }));
+        }
+
+        // If we discovered an existing PR, update state + SWR cache
+        if (data.prNumber && data.prStatus) {
+          updateSessionPullRequest({
+            prNumber: data.prNumber,
+            prStatus: data.prStatus,
+          });
+        }
+      } catch (err) {
+        console.error("[check-pr] Failed to check for existing PR:", err);
+      }
+    })();
+  }, [
+    sessionRecord.cloneUrl,
+    sessionRecord.prNumber,
+    sessionId,
+    updateSessionPullRequest,
+  ]);
+
   const updateSessionSnapshot = useCallback(
     (snapshotUrl: string, snapshotCreatedAt: Date) => {
       setHasSnapshotState(true);
