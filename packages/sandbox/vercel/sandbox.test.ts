@@ -305,3 +305,53 @@ describe("VercelSandbox.execDetached", () => {
     ).rejects.toThrow("npm ERR! code ENOENT");
   });
 });
+
+describe("VercelSandbox.updateEnv", () => {
+  test("adds new env vars and merges with existing", async () => {
+    const sandbox = await sandboxModule.VercelSandbox.connect("sbx-test", {
+      env: { EXISTING: "val" },
+      remainingTimeout: 0,
+    });
+
+    sandbox.updateEnv({ NEW_VAR: "hello" });
+
+    expect(sandbox.env).toEqual({ EXISTING: "val", NEW_VAR: "hello" });
+  });
+
+  test("removes env vars when value is undefined", async () => {
+    const sandbox = await sandboxModule.VercelSandbox.connect("sbx-test", {
+      env: { TO_REMOVE: "val", KEEP: "yes" },
+      remainingTimeout: 0,
+    });
+
+    sandbox.updateEnv({ TO_REMOVE: undefined });
+
+    expect(sandbox.env).toEqual({ KEEP: "yes" });
+  });
+
+  test("initializes env from empty when sandbox had no env", async () => {
+    const sandbox = await sandboxModule.VercelSandbox.connect("sbx-test", {
+      remainingTimeout: 0,
+    });
+
+    expect(sandbox.env).toBeUndefined();
+
+    sandbox.updateEnv({ FRESH: "value" });
+
+    expect(sandbox.env).toEqual({ FRESH: "value" });
+  });
+
+  test("updated env is used in subsequent exec calls", async () => {
+    const sandbox = await sandboxModule.VercelSandbox.connect("sbx-test", {
+      env: { BASE: "original" },
+      remainingTimeout: 0,
+    });
+
+    sandbox.updateEnv({ ADDED: "new" });
+
+    await sandbox.exec("echo test", "/vercel/sandbox", 5_000);
+
+    expect(lastRunCommandEnv?.BASE).toBe("original");
+    expect(lastRunCommandEnv?.ADDED).toBe("new");
+  });
+});

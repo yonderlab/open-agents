@@ -15,7 +15,7 @@ const MAX_OUTPUT_LENGTH = 50_000;
 export class LocalSandbox implements Sandbox {
   readonly type = "local" as const;
   readonly workingDirectory: string;
-  readonly env?: Record<string, string>;
+  private _env?: Record<string, string>;
   readonly environmentDetails = `- Full shell access with all standard CLI tools
 - Git and GitHub CLI (gh) available
 - Can install packages and run any commands`;
@@ -24,9 +24,31 @@ export class LocalSandbox implements Sandbox {
   /** Local sandboxes do not timeout */
   readonly timeout = undefined;
 
+  get env(): Record<string, string> | undefined {
+    return this._env;
+  }
+
   constructor(workingDirectory: string, env?: Record<string, string>) {
     this.workingDirectory = workingDirectory;
-    this.env = env;
+    this._env = env;
+  }
+
+  /**
+   * Update or add environment variables for this sandbox.
+   * New variables are merged with existing ones; pass `undefined` as a value to remove a variable.
+   * Changes take effect on subsequent command executions.
+   */
+  updateEnv(env: Record<string, string | undefined>): void {
+    if (!this._env) {
+      this._env = {};
+    }
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) {
+        delete this._env[key];
+      } else {
+        this._env[key] = value;
+      }
+    }
   }
 
   async readFile(path: string, encoding: "utf-8"): Promise<string> {

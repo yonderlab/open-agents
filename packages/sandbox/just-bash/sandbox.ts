@@ -70,7 +70,7 @@ export interface JustBashSandboxConfig {
 export class JustBashSandbox implements Sandbox {
   readonly type = "in-memory" as const;
   readonly workingDirectory: string;
-  readonly env?: Record<string, string>;
+  private _env?: Record<string, string>;
   readonly hooks?: SandboxHooks;
   readonly environmentDetails =
     `- Simulated shell environment (not a real bash process)
@@ -85,6 +85,28 @@ export class JustBashSandbox implements Sandbox {
   private bash: Bash;
   private mode: "memory" | "overlay";
 
+  get env(): Record<string, string> | undefined {
+    return this._env;
+  }
+
+  /**
+   * Update or add environment variables for this sandbox.
+   * New variables are merged with existing ones; pass `undefined` as a value to remove a variable.
+   * Changes take effect on subsequent command executions.
+   */
+  updateEnv(env: Record<string, string | undefined>): void {
+    if (!this._env) {
+      this._env = {};
+    }
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) {
+        delete this._env[key];
+      } else {
+        this._env[key] = value;
+      }
+    }
+  }
+
   private constructor(
     workingDirectory: string,
     bash: Bash,
@@ -95,7 +117,7 @@ export class JustBashSandbox implements Sandbox {
     this.workingDirectory = workingDirectory;
     this.bash = bash;
     this.mode = mode;
-    this.env = env;
+    this._env = env;
     this.hooks = hooks;
   }
 

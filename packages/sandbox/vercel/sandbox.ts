@@ -51,7 +51,12 @@ export class VercelSandbox implements Sandbox {
    */
   readonly id: string;
   readonly workingDirectory: string;
-  readonly env?: Record<string, string>;
+  private _env?: Record<string, string>;
+
+  get env(): Record<string, string> | undefined {
+    return this._env;
+  }
+
   /**
    * The current git branch in the sandbox.
    * Set when a newBranch is created, or when cloning from a specific branch.
@@ -97,7 +102,7 @@ export class VercelSandbox implements Sandbox {
     this.sdk = sdk;
     this.id = id;
     this.workingDirectory = workingDirectory;
-    this.env = env;
+    this._env = env;
     this.currentBranch = currentBranch;
     this.hooks = hooks;
     this._ports = ports;
@@ -321,6 +326,24 @@ ${hostLine}${portLines}${runtimeEnvLine}`;
       ...this.env,
       ...runtimePreviewEnv,
     };
+  }
+
+  /**
+   * Update or add environment variables for this sandbox.
+   * New variables are merged with existing ones; pass `undefined` as a value to remove a variable.
+   * Changes take effect on subsequent command executions.
+   */
+  updateEnv(env: Record<string, string | undefined>): void {
+    if (!this._env) {
+      this._env = {};
+    }
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) {
+        delete this._env[key];
+      } else {
+        this._env[key] = value;
+      }
+    }
   }
 
   /**

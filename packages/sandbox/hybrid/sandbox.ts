@@ -160,6 +160,21 @@ export class HybridSandbox implements Sandbox {
   }
 
   /**
+   * Update or add environment variables for this sandbox.
+   * Delegates to the current active sandbox (JustBash or Vercel).
+   * If both are present (during/after handoff), updates both so the
+   * env stays consistent regardless of which sandbox serves requests.
+   */
+  updateEnv(env: Record<string, string | undefined>): void {
+    if (this.justBash) {
+      this.justBash.updateEnv(env);
+    }
+    if (this.vercel) {
+      this.vercel.updateEnv(env);
+    }
+  }
+
+  /**
    * Get the current pending operations for persistence.
    */
   get pendingOperations(): PendingOperation[] {

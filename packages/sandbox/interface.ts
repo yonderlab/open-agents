@@ -247,6 +247,16 @@ export interface Sandbox {
   extendTimeout?(additionalMs: number): Promise<{ expiresAt: number }>;
 
   /**
+   * Update or add environment variables for this sandbox.
+   * New variables are merged with existing ones; pass `undefined` as a value to remove a variable.
+   * These changes take effect on subsequent command executions.
+   *
+   * @example
+   * sandbox.updateEnv({ API_KEY: "new-key", OLD_VAR: undefined });
+   */
+  updateEnv(env: Record<string, string | undefined>): void;
+
+  /**
    * Create a native Vercel snapshot of the sandbox filesystem.
    * IMPORTANT: This automatically stops the sandbox after snapshot creation.
    * Only supported by cloud sandboxes (Vercel).
