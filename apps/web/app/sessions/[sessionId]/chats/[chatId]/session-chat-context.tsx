@@ -290,10 +290,7 @@ export function SessionChatProvider({
           const runId = response.headers.get("x-workflow-run-id");
           if (runId) {
             try {
-              localStorage.setItem(
-                `workflow-run-${chatInfo.id}`,
-                runId,
-              );
+              localStorage.setItem(`workflow-run-${chatInfo.id}`, runId);
             } catch {
               // localStorage may be unavailable
             }

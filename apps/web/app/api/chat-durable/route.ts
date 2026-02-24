@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  discoverSkills,
-  gateway,
-} from "@open-harness/agent";
+import { discoverSkills, gateway } from "@open-harness/agent";
 import { connectSandbox } from "@open-harness/sandbox";
 import { DEFAULT_SANDBOX_PORTS } from "@/lib/sandbox/config";
 import {
@@ -264,7 +261,8 @@ export async function POST(req: Request) {
   // Build serializable sandbox state for the workflow.
   // Workflow arguments must be JSON-serializable – we cannot pass the live
   // sandbox instance (it contains SDK clients, timers, etc.).
-  const sandboxState = sandbox.getState?.() as import("@open-harness/sandbox").SandboxState;
+  const sandboxState =
+    sandbox.getState?.() as import("@open-harness/sandbox").SandboxState;
   if (!sandboxState) {
     return Response.json(
       { error: "Sandbox does not support state serialization" },

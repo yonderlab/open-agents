@@ -1,4 +1,8 @@
-import type { Sandbox, SandboxState, ConnectOptions } from "@open-harness/sandbox";
+import type {
+  Sandbox,
+  SandboxState,
+  ConnectOptions,
+} from "@open-harness/sandbox";
 import {
   gateway,
   type LanguageModel,
@@ -98,7 +102,9 @@ export async function reconstituteDurableCallOptions(
     options.sandboxConnectOptions,
   );
 
-  const model = options.modelId ? gateway(options.modelId as Parameters<typeof gateway>[0]) : undefined;
+  const model = options.modelId
+    ? gateway(options.modelId as Parameters<typeof gateway>[0])
+    : undefined;
   const subagentModel = options.subagentModelId
     ? gateway(options.subagentModelId as Parameters<typeof gateway>[0])
     : undefined;
@@ -200,7 +206,9 @@ export type DurableOpenHarnessAgent = typeof durableOpenHarnessAgent;
  * }
  * ```
  */
-export function prepareDurableCall(options: DurableOpenHarnessAgentCallOptions) {
+export function prepareDurableCall(
+  options: DurableOpenHarnessAgentCallOptions,
+) {
   const approval: ApprovalConfig = options.approval;
   const callModel = options.model ?? durableDefaultModel;
   const subagentModel = options.subagentModel;
