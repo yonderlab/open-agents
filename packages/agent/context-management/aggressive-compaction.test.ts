@@ -3,7 +3,7 @@ import type { ModelMessage, StepResult, ToolSet } from "ai";
 import { aggressiveCompactContext } from "./aggressive-compaction";
 
 const COMPACTED_NOTICE =
-  "This tool output was compacted to save context. Please run the tool again if needed.";
+  "This tool payload was compacted to save context. Please run the tool again if needed.";
 
 type ToolCallSnapshot = { id: string; input: unknown };
 type ToolResultSnapshot = { id: string; output: unknown };

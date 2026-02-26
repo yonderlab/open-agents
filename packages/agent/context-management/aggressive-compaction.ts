@@ -6,7 +6,7 @@ import {
 } from "ai";
 
 const DEFAULT_COMPACTED_NOTICE =
-  "This tool output was compacted to save context. Please run the tool again if needed.";
+  "This tool payload was compacted to save context. Please run the tool again if needed.";
 
 const DEFAULT_TRIGGER_PERCENT = 0.4;
 const DEFAULT_MIN_SAVINGS_PERCENT = 0.2;

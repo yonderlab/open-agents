@@ -101,6 +101,8 @@ export const openHarnessAgent = new ToolLoopAgent({
 
     return {
       messages: addCacheControl({
+        // TODO: If needed, expose aggressive compaction tuning via call options
+        // (for example retainRecentToolCalls/triggerPercent/minSavingsPercent).
         messages: aggressiveCompactContext({
           messages,
           steps,
