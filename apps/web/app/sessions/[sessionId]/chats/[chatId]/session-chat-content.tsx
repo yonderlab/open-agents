@@ -977,7 +977,24 @@ export function SessionChatContent({ initialModels }: SessionChatContentProps) {
     () =>
       groupedRenderMessages.map(
         ({ message: m, groups, isStreaming: isMessageStreaming }) => {
-          return groups.map((group) => {
+          // For assistant messages, find the LAST non-empty text part
+          // and only render that one (inbox mode — concise summary).
+          const lastAssistantTextIndex = (() => {
+            if (m.role !== "assistant") return -1;
+            for (let i = groups.length - 1; i >= 0; i--) {
+              const g = groups[i];
+              if (
+                g.type === "part" &&
+                g.part.type === "text" &&
+                g.part.text.trim()
+              ) {
+                return i;
+              }
+            }
+            return -1;
+          })();
+
+          return groups.map((group, groupIndex) => {
             // Hide task groups entirely — inbox mode
             if (group.type === "task-group") {
               return null;
@@ -1002,6 +1019,14 @@ export function SessionChatContent({ initialModels }: SessionChatContentProps) {
               // Inbox mode: hide assistant text while the agent is still
               // working — only reveal once the stream is complete.
               if (m.role === "assistant" && isMessageStreaming) {
+                return null;
+              }
+
+              // Inbox mode: only render the last text part for assistant messages
+              if (
+                m.role === "assistant" &&
+                groupIndex !== lastAssistantTextIndex
+              ) {
                 return null;
               }
 
