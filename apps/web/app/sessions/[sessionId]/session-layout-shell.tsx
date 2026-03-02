@@ -39,7 +39,11 @@ export function SessionLayoutShell({
   useSessionChats(sessionId, { initialData: initialChatsData });
 
   // Fetch all sessions for the inbox sidebar
-  const { sessions, loading: sessionsLoading } = useSessions({
+  const {
+    sessions,
+    loading: sessionsLoading,
+    refreshSessions,
+  } = useSessions({
     enabled: true,
   });
 
@@ -62,12 +66,26 @@ export function SessionLayoutShell({
     [router],
   );
 
+  // Handle renaming a session
+  const handleRenameSession = useCallback(
+    async (targetSessionId: string, title: string) => {
+      await fetch(`/api/sessions/${targetSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      await refreshSessions();
+    },
+    [refreshSessions],
+  );
+
   const sidebarContent = (
     <InboxSidebar
       sessions={sessions}
       sessionsLoading={sessionsLoading}
       activeSessionId={sessionId}
       onSessionClick={handleSessionClick}
+      onRenameSession={handleRenameSession}
       lastRepo={lastRepo}
     />
   );
