@@ -157,7 +157,7 @@ const SessionRow = memo(function SessionRow({
           onClick={() => onSessionClick(session)}
           onMouseEnter={() => onSessionPrefetch(session)}
           onFocus={() => onSessionPrefetch(session)}
-          className="block w-full pr-10 text-left"
+          className="block w-full text-left"
         >
           <div className="flex items-baseline justify-between gap-2">
             <p
