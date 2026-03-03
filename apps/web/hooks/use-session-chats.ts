@@ -109,6 +109,57 @@ function overlaysEqual(
   );
 }
 
+export function deriveSessionSummaryFromChats(
+  nextChats: SessionChatListItem[],
+): {
+  hasUnread: boolean;
+  hasStreaming: boolean;
+  latestChatId: string | null;
+} {
+  const latestChat = nextChats.length > 0 ? nextChats[0] : null;
+
+  return {
+    hasUnread: nextChats.some((chat) => chat.hasUnread),
+    hasStreaming: nextChats.some((chat) => chat.isStreaming),
+    latestChatId: latestChat ? latestChat.id : null,
+  };
+}
+
+export function applySessionSummaryFromChats(
+  current: SessionsResponse | undefined,
+  sessionId: string,
+  nextChats: SessionChatListItem[],
+): SessionsResponse | undefined {
+  if (!current) {
+    return current;
+  }
+
+  const summary = deriveSessionSummaryFromChats(nextChats);
+
+  let changed = false;
+  const sessions = current.sessions.map((session) => {
+    if (session.id !== sessionId) {
+      return session;
+    }
+
+    if (
+      session.hasUnread === summary.hasUnread &&
+      session.hasStreaming === summary.hasStreaming &&
+      session.latestChatId === summary.latestChatId
+    ) {
+      return session;
+    }
+
+    changed = true;
+    return {
+      ...session,
+      ...summary,
+    };
+  });
+
+  return changed ? { ...current, sessions } : current;
+}
+
 export function useSessionChats(
   sessionId: string | null,
   options?: UseSessionChatsOptions,
@@ -273,42 +324,9 @@ export function useSessionChats(
         return;
       }
 
-      const hasUnread = nextChats.some((chat) => chat.hasUnread);
-      const hasStreaming = nextChats.some((chat) => chat.isStreaming);
-      const latestChatId = nextChats[0]?.id ?? null;
-
       void mutateSessionSummaries<SessionsResponse>(
         "/api/sessions",
-        (current) => {
-          if (!current) {
-            return current;
-          }
-
-          let changed = false;
-          const sessions = current.sessions.map((session) => {
-            if (session.id !== sessionId) {
-              return session;
-            }
-
-            if (
-              session.hasUnread === hasUnread &&
-              session.hasStreaming === hasStreaming &&
-              session.latestChatId === latestChatId
-            ) {
-              return session;
-            }
-
-            changed = true;
-            return {
-              ...session,
-              hasUnread,
-              hasStreaming,
-              latestChatId,
-            };
-          });
-
-          return changed ? { ...current, sessions } : current;
-        },
+        (current) => applySessionSummaryFromChats(current, sessionId, nextChats),
         { revalidate: false },
       );
     },
@@ -320,7 +338,7 @@ export function useSessionChats(
       return;
     }
 
-    const hasStreaming = chats.some((chat) => chat.isStreaming);
+    const summary = deriveSessionSummaryFromChats(chats);
     const previousStreamingState = sessionStreamingStateRef.current;
     const wasStreamingInSession =
       previousStreamingState.sessionId === sessionId &&
@@ -328,12 +346,12 @@ export function useSessionChats(
 
     sessionStreamingStateRef.current = {
       sessionId,
-      hasStreaming,
+      hasStreaming: summary.hasStreaming,
     };
 
     syncSessionSummaryFromChats(chats);
 
-    if (wasStreamingInSession && !hasStreaming) {
+    if (wasStreamingInSession && !summary.hasStreaming) {
       void mutateSessionSummaries("/api/sessions");
     }
   }, [chats, mutateSessionSummaries, sessionId, syncSessionSummaryFromChats]);
