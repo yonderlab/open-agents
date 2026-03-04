@@ -503,11 +503,13 @@ function SandboxInputOverlay({
 
 function ShareDialog({
   sessionId,
+  chatId,
   initialShareId,
   externalOpen,
   onExternalOpenChange,
 }: {
   sessionId: string;
+  chatId: string;
   initialShareId: string | null;
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
@@ -534,13 +536,47 @@ function ShareDialog({
 
   const shareUrl = shareId && baseUrl ? `${baseUrl}/shared/${shareId}` : null;
 
+  useEffect(() => {
+    let active = true;
+    setShareId(initialShareId);
+    setCopied(false);
+    setError(null);
+
+    const loadShareId = async () => {
+      try {
+        const res = await fetch(
+          `/api/sessions/${sessionId}/chats/${chatId}/share`,
+        );
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as { shareId: string | null };
+        if (!active) {
+          return;
+        }
+        setShareId(data.shareId);
+      } catch {
+        // Ignore silent refresh errors in dialog state; user action still works.
+      }
+    };
+
+    void loadShareId();
+
+    return () => {
+      active = false;
+    };
+  }, [sessionId, chatId, initialShareId]);
+
   async function enableSharing() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/share`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/sessions/${sessionId}/chats/${chatId}/share`,
+        {
+          method: "POST",
+        },
+      );
       if (!res.ok) {
         setError("Failed to enable sharing");
         return;
@@ -558,9 +594,12 @@ function ShareDialog({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/share`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/sessions/${sessionId}/chats/${chatId}/share`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!res.ok) {
         setError("Failed to disable sharing");
         return;
@@ -596,9 +635,9 @@ function ShareDialog({
       )}
       <DialogContent showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Share session</DialogTitle>
+          <DialogTitle>Share chat</DialogTitle>
           <DialogDescription>
-            Anyone with the link can view the conversation in read-only mode.
+            Anyone with the link can view this chat in read-only mode.
           </DialogDescription>
         </DialogHeader>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -690,14 +729,21 @@ export function SessionChatContent(_props: unknown) {
   const [mobileChatDrawerOpen, setMobileChatDrawerOpen] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedAssistantMessageId, setCopiedAssistantMessageId] = useState<
+    string | null
+  >(null);
   const hasMounted = useHasMounted();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
+  const copyResetTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
     };
   }, []);
   const {
@@ -717,6 +763,36 @@ export function SessionChatContent(_props: unknown) {
       inputRef.current?.focus();
     }
   };
+
+  const handleCopyAssistantMessage = useCallback(
+    async (messageId: string, text: string) => {
+      const trimmedText = text.trim();
+      if (trimmedText.length === 0) {
+        return;
+      }
+
+      if (typeof navigator === "undefined" || !navigator.clipboard) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(trimmedText);
+        setCopiedAssistantMessageId(messageId);
+        if (copyResetTimeoutRef.current !== null) {
+          window.clearTimeout(copyResetTimeoutRef.current);
+        }
+        copyResetTimeoutRef.current = window.setTimeout(() => {
+          setCopiedAssistantMessageId((currentMessageId) =>
+            currentMessageId === messageId ? null : currentMessageId,
+          );
+          copyResetTimeoutRef.current = null;
+        }, 2000);
+      } catch (copyError) {
+        console.error("Failed to copy assistant message:", copyError);
+      }
+    },
+    [],
+  );
 
   // Auto-resize textarea up to 3 lines
   useEffect(() => {
@@ -795,8 +871,8 @@ export function SessionChatContent(_props: unknown) {
     updateSessionRepo,
     updateSessionPullRequest,
     checkBranchAndPr,
-    models,
-    modelsLoading,
+    modelOptions,
+    modelOptionsLoading,
   } = useSessionChatContext();
   const mobileActiveChatId = chatInfo.id;
   const handleMobileNewChat = () => {
@@ -1237,6 +1313,11 @@ export function SessionChatContent(_props: unknown) {
     [chatInfo.modelId, updateChatModel],
   );
 
+  const selectedModelOption = useMemo(
+    () => modelOptions.find((option) => option.id === chatInfo.modelId),
+    [modelOptions, chatInfo.modelId],
+  );
+
   const handleFileSelect = (
     value: string,
     mentionStart: number,
@@ -1643,14 +1724,12 @@ export function SessionChatContent(_props: unknown) {
     const becameError = status === "error" && prevStatus !== "error";
     const shouldClearStreaming = status === "error" || becameReady;
     prevStatusRef.current = status;
-    // Skip clearing the streaming overlay during unmount. When the user
-    // switches to another chat, the cleanup effect calls chatInstance.stop()
-    // which triggers an AbortError -> status "ready" transition. If that
-    // status change propagates before React finishes tearing down the
-    // component tree, this effect would clear the optimistic streaming
-    // overlay even though the server-side stream is still running. The
-    // SWR polling and overlay reconciliation will clear it once the server
-    // confirms the stream has actually ended.
+    // Skip clearing the streaming overlay during unmount. Route teardown aborts
+    // local transport connections, which can still trigger a transient status
+    // transition before React finishes unmounting. Clearing here would remove
+    // the optimistic streaming badge even though the server-side stream may
+    // still be running. SWR polling + overlay reconciliation clear it once the
+    // server confirms the stream has actually ended.
     if (shouldClearStreaming && isMountedRef.current) {
       void setChatStreaming(chatInfo.id, false);
     }
@@ -2473,7 +2552,8 @@ export function SessionChatContent(_props: unknown) {
             {/* Mobile share dialog */}
             <ShareDialog
               sessionId={session.id}
-              initialShareId={session.shareId}
+              chatId={chatInfo.id}
+              initialShareId={null}
               externalOpen={mobileShareOpen}
               onExternalOpenChange={setMobileShareOpen}
             />
@@ -2586,6 +2666,16 @@ export function SessionChatContent(_props: unknown) {
                     }
 
                     if (p.type === "text") {
+                      const isFinalAssistantTextPart =
+                        m.role === "assistant" &&
+                        !m.parts
+                          .slice(group.index + 1)
+                          .some((messagePart) => messagePart.type === "text");
+                      const canCopyAssistantMessage =
+                        isFinalAssistantTextPart &&
+                        !isMessageStreaming &&
+                        p.text.trim().length > 0;
+
                       return (
                         <div
                           key={`${m.id}-${group.renderKey}`}
@@ -2637,7 +2727,7 @@ export function SessionChatContent(_props: unknown) {
                               )}
                             </div>
                           ) : (
-                            <div className="min-w-0 w-full overflow-hidden">
+                            <div className="group min-w-0 w-full overflow-hidden">
                               <Streamdown
                                 animated={
                                   isMessageStreaming
@@ -2656,6 +2746,27 @@ export function SessionChatContent(_props: unknown) {
                               >
                                 {p.text}
                               </Streamdown>
+                              {canCopyAssistantMessage && (
+                                <div className="mt-1 flex justify-start">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleCopyAssistantMessage(
+                                        m.id,
+                                        p.text,
+                                      )
+                                    }
+                                    aria-label="Copy assistant response"
+                                    className="rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                                  >
+                                    {copiedAssistantMessageId === m.id ? (
+                                      <Check className="h-4 w-4" />
+                                    ) : (
+                                      <Copy className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -3031,15 +3142,14 @@ export function SessionChatContent(_props: unknown) {
                   {renderMessages.length === 0 && chatInfo.modelId ? (
                     <div
                       className={
-                        isChatInFlight || isUpdatingModel
+                        isChatInFlight || isUpdatingModel || modelOptionsLoading
                           ? "pointer-events-none opacity-60"
                           : undefined
                       }
                     >
                       <ModelSelectorCompact
                         value={chatInfo.modelId}
-                        models={models}
-                        isLoading={modelsLoading}
+                        modelOptions={modelOptions}
                         onChange={(modelId) => {
                           void handleModelChange(modelId);
                         }}
@@ -3048,7 +3158,7 @@ export function SessionChatContent(_props: unknown) {
                   ) : (
                     chatInfo.modelId && (
                       <span className="text-xs text-muted-foreground/60">
-                        {chatInfo.modelId}
+                        {selectedModelOption?.label ?? chatInfo.modelId}
                       </span>
                     )
                   )}
