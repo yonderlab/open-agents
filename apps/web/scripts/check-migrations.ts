@@ -27,7 +27,7 @@ const before = new Set(
 
 // Run drizzle-kit generate (produces a new .sql file if schema drifted)
 try {
-  execSync("bunx drizzle-kit generate", {
+  execSync("bun run db:generate", {
     cwd: join(import.meta.dirname, ".."),
     stdio: "pipe",
   });
