@@ -404,10 +404,6 @@ export function InboxSidebar({
     async (session: SessionWithUnread) => {
       try {
         await onArchiveSession(session.id);
-        lastLoadedArchivedCountRef.current = Math.max(
-          lastLoadedArchivedCountRef.current + 1,
-          archivedCount + 1,
-        );
         setArchivedSessions((current) => {
           const nextSessions = [
             { ...session, status: "archived" as const },
