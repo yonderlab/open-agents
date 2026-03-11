@@ -217,6 +217,10 @@ interface GroupedRenderMessage {
   groups: MessageRenderGroup[];
   isStreaming: boolean;
   hiddenActivitySummary: HiddenActivitySummary;
+  /** Epoch ms when this assistant turn started (preceding user message createdAt). */
+  startedAtMs: number | null;
+  /** Total duration in ms for completed assistant turns. */
+  durationMs: number | null;
 }
 
 type ActivityTodoSummary = {
@@ -405,13 +409,17 @@ function ActivityStatusBar({
   summary,
   isStreaming,
   startedAtMs,
+  durationMs,
 }: {
   summary?: HiddenActivitySummary | null;
   isStreaming: boolean;
   startedAtMs?: number | null;
+  /** Pre-computed duration for completed messages. */
+  durationMs?: number | null;
 }) {
   const effectiveSummary = summary ?? EMPTY_HIDDEN_ACTIVITY_SUMMARY;
-  const elapsedMs = useStreamingElapsedMs(isStreaming, startedAtMs);
+  const streamingElapsedMs = useStreamingElapsedMs(isStreaming, startedAtMs);
+  const displayMs = isStreaming ? streamingElapsedMs : (durationMs ?? null);
 
   let label = "Done";
 
@@ -434,9 +442,9 @@ function ActivityStatusBar({
 
   const details: { label: string; className?: string }[] = [];
 
-  if (elapsedMs !== null && elapsedMs > 0) {
+  if (displayMs !== null && displayMs > 0) {
     details.push({
-      label: formatActivityDuration(elapsedMs),
+      label: formatActivityDuration(displayMs),
       className: "tabular-nums",
     });
   }
@@ -1502,11 +1510,37 @@ export function SessionChatContent({
         }
       }
 
+      // Compute timing from message metadata createdAt
+      let startedAtMs: number | null = null;
+      let durationMs: number | null = null;
+
+      if (message.role === "assistant") {
+        const prevMessage =
+          messageIndex > 0 ? renderMessages[messageIndex - 1] : null;
+        const prevCreatedAt =
+          prevMessage?.role === "user"
+            ? (prevMessage.metadata?.createdAt ?? null)
+            : null;
+
+        if (prevCreatedAt != null) {
+          startedAtMs = prevCreatedAt;
+        }
+
+        if (!isStreaming && startedAtMs != null) {
+          const assistantCreatedAt = message.metadata?.createdAt ?? null;
+          if (assistantCreatedAt != null) {
+            durationMs = Math.max(0, assistantCreatedAt - startedAtMs);
+          }
+        }
+      }
+
       return {
         message,
         groups,
         isStreaming,
         hiddenActivitySummary,
+        startedAtMs,
+        durationMs,
       };
     });
   }, [renderMessages, isChatInFlight]);
@@ -3091,6 +3125,8 @@ export function SessionChatContent({
                   groups,
                   isStreaming: isMessageStreaming,
                   hiddenActivitySummary,
+                  startedAtMs: messageStartedAtMs,
+                  durationMs: messageDurationMs,
                 }) => {
                   const showActivitySummary =
                     hideToolDetails &&
@@ -3103,11 +3139,8 @@ export function SessionChatContent({
                         <ActivityStatusBar
                           summary={hiddenActivitySummary}
                           isStreaming={isMessageStreaming}
-                          startedAtMs={
-                            isMessageStreaming
-                              ? inFlightStartedAtRef.current
-                              : null
-                          }
+                          startedAtMs={messageStartedAtMs}
+                          durationMs={messageDurationMs}
                         />
                       )}
                       {groups.map((group) => {

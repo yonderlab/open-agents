@@ -118,7 +118,16 @@ export default async function SessionChatPage({
     notFound();
   }
 
-  const initialMessages = dbMessages.map((m) => m.parts as WebAgentUIMessage);
+  const initialMessages = dbMessages.map((m) => {
+    const message = m.parts as WebAgentUIMessage;
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        createdAt: m.createdAt.getTime(),
+      },
+    };
+  });
   const initialModelOptions = withMissingModelOption(
     buildSessionChatModelOptions(initialModels, preferences.modelVariants),
     chat.modelId,
