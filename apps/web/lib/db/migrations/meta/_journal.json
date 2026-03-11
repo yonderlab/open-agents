@@ -148,6 +148,13 @@
       "when": 1773245569775,
       "tag": "0020_black_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1773246439944,
+      "tag": "0021_user_preferences_schema_repair",
+      "breakpoints": true
     }
   ]
 }
