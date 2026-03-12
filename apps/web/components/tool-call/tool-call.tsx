@@ -66,7 +66,14 @@ export function ToolCall({
     case "tool-grep":
       return <GrepRenderer part={part} state={state} {...approvalProps} />;
     case "tool-task":
-      return <TaskRenderer part={part} state={state} {...approvalProps} />;
+      return (
+        <TaskRenderer
+          part={part}
+          state={state}
+          isStreaming={isStreaming}
+          {...approvalProps}
+        />
+      );
     case "tool-todo_write":
       // Todo tool doesn't require approval, so approvalProps are intentionally omitted
       return <TodoRenderer part={part} state={state} />;

@@ -1,11 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatTokens } from "@open-harness/shared";
+import type { TaskPendingToolCall } from "@open-harness/agent";
+import { formatTokens, toRelativePath } from "@open-harness/shared";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ToolRendererProps } from "@/app/lib/render-tool";
+import { DEFAULT_WORKING_DIRECTORY } from "@/lib/sandbox/config";
 import { ToolLayout } from "../tool-layout";
+
+function getToolSummary(toolCall: TaskPendingToolCall): string {
+  const input = toolCall.input as Record<string, unknown> | undefined;
+  switch (toolCall.name) {
+    case "read":
+    case "write":
+    case "edit": {
+      const fp = input?.filePath ?? "";
+      return fp ? toRelativePath(String(fp), DEFAULT_WORKING_DIRECTORY) : "";
+    }
+    case "grep":
+    case "glob":
+      return input?.pattern ? `"${input.pattern}"` : "";
+    case "bash": {
+      const cmd = input?.command ? String(input.command) : "";
+      return cmd.length > 60 ? cmd.slice(0, 60) + "…" : cmd;
+    }
+    default:
+      return "";
+  }
+}
 
 function countToolCalls(messages: unknown): number {
   if (!Array.isArray(messages)) return 0;
@@ -89,12 +112,20 @@ function getSubagentSummary(messages: unknown): string | null {
   return null;
 }
 
+function getPendingToolLabel(toolCall: TaskPendingToolCall): string {
+  const displayName =
+    toolCall.name.charAt(0).toUpperCase() + toolCall.name.slice(1);
+  const summary = getToolSummary(toolCall);
+  return summary ? `${displayName} ${summary}` : displayName;
+}
+
 export function TaskRenderer({
   part,
   state,
+  isStreaming = false,
   onApprove,
   onDeny,
-}: ToolRendererProps<"tool-task">) {
+}: ToolRendererProps<"tool-task"> & { isStreaming?: boolean }) {
   const input = part.input;
   const desc = input?.task ?? "Spawning subagent";
   const fullPrompt = input?.instructions;
@@ -107,16 +138,21 @@ export function TaskRenderer({
   const isComplete = hasOutput && !isPreliminary;
   const output = hasOutput ? part.output : undefined;
 
+  const pendingToolCall: TaskPendingToolCall | null = output?.pending ?? null;
   const toolCount =
     output?.toolCallCount ?? (isComplete ? countToolCalls(output?.final) : 0);
   const tokenCount = output?.usage?.inputTokens ?? null;
 
+  // Detect running/interrupted properly for task tools.
+  // extractRenderState only knows about input-streaming/input-available,
+  // but tasks also run in output-available + preliminary state.
   const isTaskStreaming = hasOutput && isPreliminary;
   const isRunningState =
     part.state === "input-streaming" ||
     part.state === "input-available" ||
     isTaskStreaming;
-  const isActuallyRunning = isRunningState && !state.interrupted;
+  const isInterrupted = isRunningState && !isStreaming;
+  const isActuallyRunning = isRunningState && isStreaming;
 
   const startedAt =
     typeof output?.startedAt === "number" ? output.startedAt : undefined;
@@ -131,9 +167,9 @@ export function TaskRenderer({
           ? "General"
           : "Task";
 
-  const indicator = state.interrupted ? (
+  const indicator = isInterrupted ? (
     <span className="inline-block h-2 w-2 rounded-full border border-yellow-500" />
-  ) : state.running || isActuallyRunning ? (
+  ) : isActuallyRunning ? (
     <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
   ) : (
     <span
@@ -175,10 +211,32 @@ export function TaskRenderer({
   // Extract subagent's final summary when complete
   const subagentSummary = isComplete ? getSubagentSummary(output?.final) : null;
 
-  const hasExpandableContent = Boolean(fullPrompt) || subagentSummary !== null;
+  // Current tool activity label (one-liner)
+  const currentToolLabel = pendingToolCall
+    ? getPendingToolLabel(pendingToolCall)
+    : null;
+
+  const hasExpandableContent =
+    Boolean(fullPrompt) ||
+    subagentSummary !== null ||
+    currentToolLabel !== null;
+
+  // Override state for ToolLayout so it reflects task-specific interrupted/running
+  const layoutState = {
+    ...state,
+    running: isActuallyRunning,
+    interrupted: isInterrupted,
+  };
 
   const expandedContent = hasExpandableContent ? (
     <div className="space-y-3">
+      {/* Live tool activity when running */}
+      {currentToolLabel && (
+        <div className="text-[13px] text-muted-foreground">
+          {currentToolLabel}
+        </div>
+      )}
+
       {/* Task prompt */}
       {fullPrompt && (
         <div>
@@ -218,7 +276,7 @@ export function TaskRenderer({
       name={subagentLabel}
       summary={desc}
       meta={meta}
-      state={state}
+      state={layoutState}
       indicator={indicator}
       nameClassName={taskDenied ? "text-red-500" : undefined}
       expandedContent={expandedContent}
