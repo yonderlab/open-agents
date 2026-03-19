@@ -30,6 +30,10 @@ import {
   useUserPreferences,
 } from "@/hooks/use-user-preferences";
 import {
+  BrowserNotificationsPreference,
+  BrowserNotificationsPreferenceSkeleton,
+} from "./browser-notifications-preference";
+import {
   getDefaultModelOptionId,
   withMissingModelOption,
 } from "@/lib/model-options";
@@ -75,6 +79,8 @@ export function PreferencesSectionSkeleton() {
             Choose between light and dark mode.
           </p>
         </div>
+
+        <BrowserNotificationsPreferenceSkeleton />
 
         <div className="grid gap-2">
           <Label htmlFor="model">Default Model</Label>
@@ -232,6 +238,8 @@ export function PreferencesSection() {
             current browser.
           </p>
         </div>
+
+        <BrowserNotificationsPreference />
 
         <div className="grid gap-2">
           <Label htmlFor="model">Default Model</Label>
