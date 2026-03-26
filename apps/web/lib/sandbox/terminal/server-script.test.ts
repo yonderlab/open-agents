@@ -7,6 +7,7 @@ describe("TERMINAL_GATEWAY_SCRIPT", () => {
       'url.pathname.startsWith("/dist/")',
     );
     expect(TERMINAL_GATEWAY_SCRIPT).toContain("resolvedDistPath");
+    expect(TERMINAL_GATEWAY_SCRIPT).toContain("fileURLToPath(import.meta.url)");
     expect(TERMINAL_GATEWAY_SCRIPT).not.toContain(
       'url.pathname === "/dist/ghostty-web.js"',
     );
