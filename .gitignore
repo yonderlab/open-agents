@@ -37,3 +37,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .devtools
 .vercel
 .env*.local
+
+# open-harness dev server artifacts
+.open-harness-dev-server-state.json
+.open-harness-dev-server-*.pid
