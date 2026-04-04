@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { ModelCombobox } from "@/components/model-combobox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 
 const DEFAULT_ALLOWED_TOOLS: SubagentAllowedToolName[] = [
   "read",
@@ -281,20 +282,20 @@ export function SubagentProfilesSection({
   const builtInExplore = BUILT_IN_SUBAGENT_METADATA[0];
 
   return (
-    <div className="grid gap-4">
-      <div className="space-y-1">
+    <div className="grid gap-5">
+      <div className="space-y-1.5">
         <Label>Subagents</Label>
         <p className="text-xs text-muted-foreground">
-          The built-in Explore subagent is always available. Custom subagents
-          can combine a model, custom instructions, skills, and tool access.
+          Explore is always available. Custom subagents combine model choice,
+          instructions, skills, and tool access for delegated work.
         </p>
       </div>
 
       {builtInExplore ? (
-        <div className="grid gap-2 rounded-lg border border-border/70 p-4">
+        <div className="grid gap-3 rounded-lg border border-border/70 bg-muted/30 p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium">{builtInExplore.name}</p>
+              <p className="text-sm font-medium leading-none">{builtInExplore.name}</p>
               <p className="text-xs text-muted-foreground">
                 {builtInExplore.description}
               </p>
@@ -304,13 +305,13 @@ export function SubagentProfilesSection({
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Model: controlled by the “Subagent Model” setting above.
+            Model follows the Subagent Model setting above.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {builtInExplore.allowedTools.map((toolName) => (
               <span
                 key={toolName}
-                className="rounded-full border border-border/70 px-2 py-1 text-xs text-muted-foreground"
+                className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] text-muted-foreground"
               >
                 {toolName}
               </span>
@@ -319,7 +320,7 @@ export function SubagentProfilesSection({
         </div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">Custom subagents</p>
@@ -340,9 +341,12 @@ export function SubagentProfilesSection({
         </div>
 
         {draftProfiles.length === 0 ? (
-          <p className="text-xs italic text-muted-foreground">
-            No custom subagents configured yet.
-          </p>
+          <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-center">
+            <p className="text-sm font-medium">No custom subagents yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add one to tailor specialized delegated workflows.
+            </p>
+          </div>
         ) : null}
 
         {draftProfiles.map((profile, profileIndex) => (
@@ -374,6 +378,7 @@ export function SubagentProfilesSection({
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="text-destructive hover:text-destructive"
                 onClick={() => handleRemoveProfile(profileIndex)}
                 disabled={disabled}
               >
@@ -398,6 +403,8 @@ export function SubagentProfilesSection({
                 }
               />
             </div>
+
+            <Separator />
 
             <div className="grid gap-2">
               <Label htmlFor={`subagent-prompt-${profileIndex}`}>

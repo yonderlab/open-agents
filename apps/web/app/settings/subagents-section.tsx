@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { SubagentProfilesSection } from "./subagent-profiles-section";
 
 export function SubagentsSectionSkeleton() {
@@ -41,10 +42,13 @@ export function SubagentsSectionSkeleton() {
           </p>
         </div>
 
+        <Separator />
+
         <div className="grid gap-3">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-36" />
         </div>
       </CardContent>
     </Card>
@@ -107,7 +111,7 @@ export function SubagentsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-2">
+        <div className="grid gap-2.5">
           <Label htmlFor="subagent-model">Subagent Model</Label>
           <ModelCombobox
             value={selectedSubagentModelId}
@@ -127,10 +131,12 @@ export function SubagentsSection() {
             onChange={handleSubagentModelChange}
           />
           <p className="text-xs text-muted-foreground">
-            The AI model used for the built-in Explore subagent and as the
-            default model for new custom subagents.
+            Controls Explore by default, and pre-fills the model for any newly
+            created custom subagents.
           </p>
         </div>
+
+        <Separator />
 
         <SubagentProfilesSection
           profiles={preferences?.subagentProfiles ?? []}
