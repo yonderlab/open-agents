@@ -32,6 +32,7 @@ import type { Chat, Session } from "@/lib/db/schema";
 import { type ModelOption, withMissingModelOption } from "@/lib/model-options";
 import {
   clearSandboxState,
+  hasResumableSandboxState as hasResumableSandboxStateValue,
   hasRuntimeSandboxState as hasRuntimeSandboxStateValue,
   hasSavedSandboxState as hasSavedSandboxStateValue,
 } from "@/lib/sandbox/utils";
