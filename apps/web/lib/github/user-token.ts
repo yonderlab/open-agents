@@ -78,7 +78,10 @@ export type UserTokenStatus =
 
 export type UserTokenResult =
   | { token: string; status: "valid" }
-  | { token: null; status: "no_account" | "refresh_failed" | "no_refresh_token" };
+  | {
+      token: null;
+      status: "no_account" | "refresh_failed" | "no_refresh_token";
+    };
 
 /**
  * Get a valid GitHub user-to-server access token with status information.
