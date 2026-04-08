@@ -2,8 +2,6 @@
 
 import {
   AlertTriangle,
-  Archive,
-  ArchiveRestore,
   Check,
   ChevronDown,
   ExternalLink,
@@ -11,7 +9,6 @@ import {
   FolderGit2,
   GitCommit,
   GitPullRequest,
-  GitPullRequestClosed,
   Loader2,
   Square,
 } from "lucide-react";
@@ -25,7 +22,6 @@ import type {
   PullRequestMergeMethod,
 } from "@/lib/github/client";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
@@ -35,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CheckRunsList } from "@/components/merge-check-runs";
 import { cn } from "@/lib/utils";
-import { useGitPanel, type GitPanelTab } from "./git-panel-context";
+import { useGitPanel } from "./git-panel-context";
 import type { DevServerControls } from "./hooks/use-dev-server";
 import type { CodeEditorControls } from "./hooks/use-code-editor";
 
@@ -77,7 +73,6 @@ type GitPanelProps = {
   commitActionLabel: string;
   hasUncommittedGitChanges: boolean;
   canMergeAndArchive: boolean;
-  canCloseAndArchive: boolean;
   supportsRepoCreation: boolean;
   supportsDiff: boolean;
   hasDiff: boolean;
@@ -92,7 +87,6 @@ type GitPanelProps = {
   buildingDeploymentUrl: string | null;
 
   // Sandbox
-  isArchived: boolean;
   canRunDevServer: boolean;
   devServer: DevServerControls;
   codeEditor: CodeEditorControls;
@@ -107,12 +101,7 @@ type GitPanelProps = {
   // Actions
   onCommitClick: () => void;
   onCreatePrClick: () => void;
-  onCloseClick: () => void;
   onCreateRepoClick: () => void;
-  onArchiveClick: () => void;
-  onUnarchiveClick: () => void;
-  isUnarchiving: boolean;
-  isArchiveSnapshotPending: boolean;
   onOpenPreview: () => void;
   onOpenPr: () => void;
   onOpenBuildingDeployment: () => void;
@@ -125,25 +114,6 @@ type GitPanelProps = {
 /* ------------------------------------------------------------------ */
 /* Shared small components                                             */
 /* ------------------------------------------------------------------ */
-
-function PanelSection({
-  title,
-  children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="px-3 py-2">
-      {title && (
-        <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h3>
-      )}
-      {children}
-    </div>
-  );
-}
 
 function PanelActionRow({
   icon: Icon,
@@ -198,8 +168,19 @@ function DiffFileStatusDot({ status }: { status: DiffFile["status"] }) {
   return <span className={cn("h-2 w-2 shrink-0 rounded-full", colors[status])} />;
 }
 
+type DiffScope = "all" | "uncommitted";
+
+function isUncommittedFile(file: DiffFile): boolean {
+  return file.stagingStatus === "unstaged" || file.stagingStatus === "partial";
+}
+
 function DiffFileList({ files }: { files: DiffFile[] }) {
   const { openDiffToFile } = useGitPanel();
+  const [scope, setScope] = useState<DiffScope>("all");
+
+  const filteredFiles =
+    scope === "all" ? files : files.filter(isUncommittedFile);
+  const uncommittedCount = files.filter(isUncommittedFile).length;
 
   if (files.length === 0) {
     return (
@@ -210,8 +191,38 @@ function DiffFileList({ files }: { files: DiffFile[] }) {
   }
 
   return (
+    <div>
+      {/* Scope filter */}
+      {uncommittedCount > 0 && uncommittedCount < files.length && (
+        <div className="mb-1 flex items-center gap-1 px-1">
+          <button
+            type="button"
+            onClick={() => setScope("all")}
+            className={cn(
+              "rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+              scope === "all"
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("uncommitted")}
+            className={cn(
+              "rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+              scope === "uncommitted"
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Uncommitted
+          </button>
+        </div>
+      )}
     <div className="space-y-px">
-      {files.map((file) => {
+      {filteredFiles.map((file) => {
         const fileName = file.path.split("/").pop() ?? file.path;
         const dirPath = file.path.slice(0, -fileName.length);
 
@@ -247,6 +258,7 @@ function DiffFileList({ files }: { files: DiffFile[] }) {
           </button>
         );
       })}
+    </div>
     </div>
   );
 }
@@ -615,7 +627,6 @@ export function GitPanel(props: GitPanelProps) {
     commitActionLabel,
     hasUncommittedGitChanges,
     canMergeAndArchive,
-    canCloseAndArchive,
     supportsRepoCreation,
     supportsDiff,
     hasDiff,
@@ -624,7 +635,6 @@ export function GitPanel(props: GitPanelProps) {
     prDeploymentUrl,
     isDeploymentStale,
     buildingDeploymentUrl,
-    isArchived,
     canRunDevServer,
     devServer,
     codeEditor,
@@ -632,12 +642,7 @@ export function GitPanel(props: GitPanelProps) {
     diffSummary,
     onCommitClick,
     onCreatePrClick,
-    onCloseClick,
     onCreateRepoClick,
-    onArchiveClick,
-    onUnarchiveClick,
-    isUnarchiving,
-    isArchiveSnapshotPending,
     onOpenPreview,
     onOpenPr,
     onOpenBuildingDeployment,
@@ -730,7 +735,7 @@ export function GitPanel(props: GitPanelProps) {
 
       {/* Tab bar */}
       <div className="flex items-center gap-0.5 border-b border-border px-3 py-1">
-        {(["info", "diff", "checks"] as const).map((tab) => (
+        {(["code", "diff", "checks"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -742,7 +747,7 @@ export function GitPanel(props: GitPanelProps) {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {tab === "info" ? "Info" : tab === "diff" ? "Diff" : "Checks"}
+            {tab === "code" ? "Code" : tab === "diff" ? "Diff" : "Checks"}
             {tab === "diff" && hasDiffChanges && (
               <span className="ml-1 text-[10px] text-muted-foreground">
                 {diffFiles?.length ?? 0}
@@ -754,157 +759,79 @@ export function GitPanel(props: GitPanelProps) {
 
       {/* Panel content */}
       <div className="flex-1 overflow-y-auto">
-        {gitPanelTab === "info" && (
-          <div className="space-y-0">
-            {/* Repository info */}
-            {hasRepo && (
-              <>
-                <PanelSection title="Repository">
-                  <div className="space-y-1.5 text-sm">
-                    {session.repoOwner && session.repoName && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="truncate">
-                          {session.repoOwner}/{session.repoName}
-                        </span>
-                      </div>
-                    )}
-                    {session.branch && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="truncate font-mono text-xs">
-                          {session.branch}
-                        </span>
-                      </div>
-                    )}
-                    {hasDiffChanges && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-green-600 dark:text-green-500">
-                          +{diffSummary.totalAdditions}
-                        </span>
-                        <span className="text-red-600 dark:text-red-400">
-                          -{diffSummary.totalDeletions}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </PanelSection>
+        {gitPanelTab === "code" && (
+          <div className="p-2">
+            <div className="space-y-1">
+              {/* Dev server */}
+              {canRunDevServer && (
+                <PanelActionRow
+                  icon={
+                    devServer.state.status === "starting" ||
+                    devServer.state.status === "stopping"
+                      ? Loader2
+                      : ExternalLink
+                  }
+                  label={devServer.menuLabel}
+                  detail={devServer.menuDetail ?? undefined}
+                  onClick={() => void devServer.handlePrimaryAction()}
+                  disabled={
+                    devServer.state.status === "starting" ||
+                    devServer.state.status === "stopping"
+                  }
+                />
+              )}
+              {canRunDevServer && devServer.showStopAction && (
+                <PanelActionRow
+                  icon={Square}
+                  label={
+                    devServer.state.status === "stopping"
+                      ? "Stopping Dev Server..."
+                      : "Stop Dev Server"
+                  }
+                  onClick={() => void devServer.handleStopAction()}
+                  disabled={devServer.state.status === "stopping"}
+                />
+              )}
 
-                <Separator />
-              </>
-            )}
+              {/* Code editor */}
+              {canRunDevServer && (
+                <PanelActionRow
+                  icon={
+                    codeEditor.state.status === "starting" ||
+                    codeEditor.state.status === "stopping"
+                      ? Loader2
+                      : ExternalLink
+                  }
+                  label={codeEditor.menuLabel}
+                  detail={codeEditor.menuDetail ?? undefined}
+                  onClick={() => void codeEditor.handleOpen()}
+                  disabled={
+                    codeEditor.state.status === "starting" ||
+                    codeEditor.state.status === "stopping"
+                  }
+                />
+              )}
 
-            {/* Preview / deployment */}
-            {hasExistingPr && prDeploymentUrl && (
-              <>
-                <PanelSection>
-                  <PanelActionRow
-                    icon={ExternalLink}
-                    label={isDeploymentStale ? "Deploying…" : "Preview"}
-                    onClick={
-                      isDeploymentStale && buildingDeploymentUrl
-                        ? onOpenBuildingDeployment
-                        : onOpenPreview
-                    }
-                    disabled={isDeploymentStale && !buildingDeploymentUrl}
-                  />
-                </PanelSection>
+              {/* Preview / deployment */}
+              {hasExistingPr && prDeploymentUrl && (
+                <PanelActionRow
+                  icon={ExternalLink}
+                  label={isDeploymentStale ? "Deploying…" : "Preview"}
+                  onClick={
+                    isDeploymentStale && buildingDeploymentUrl
+                      ? onOpenBuildingDeployment
+                      : onOpenPreview
+                  }
+                  disabled={isDeploymentStale && !buildingDeploymentUrl}
+                />
+              )}
 
-                <Separator />
-              </>
-            )}
-
-            {/* Close & Archive for open PRs */}
-            {canCloseAndArchive && (
-              <>
-                <PanelSection>
-                  <PanelActionRow
-                    icon={GitPullRequestClosed}
-                    label="Close & Archive"
-                    onClick={onCloseClick}
-                  />
-                </PanelSection>
-
-                <Separator />
-              </>
-            )}
-
-            {/* Actions */}
-            <PanelSection title="Actions">
-              <div className="space-y-1">
-                {/* Dev server */}
-                {canRunDevServer && (
-                  <PanelActionRow
-                    icon={
-                      devServer.state.status === "starting" ||
-                      devServer.state.status === "stopping"
-                        ? Loader2
-                        : ExternalLink
-                    }
-                    label={devServer.menuLabel}
-                    detail={devServer.menuDetail ?? undefined}
-                    onClick={() => void devServer.handlePrimaryAction()}
-                    disabled={
-                      devServer.state.status === "starting" ||
-                      devServer.state.status === "stopping"
-                    }
-                  />
-                )}
-                {canRunDevServer && devServer.showStopAction && (
-                  <PanelActionRow
-                    icon={Square}
-                    label={
-                      devServer.state.status === "stopping"
-                        ? "Stopping Dev Server..."
-                        : "Stop Dev Server"
-                    }
-                    onClick={() => void devServer.handleStopAction()}
-                    disabled={devServer.state.status === "stopping"}
-                  />
-                )}
-
-                {/* Code editor */}
-                {canRunDevServer && (
-                  <PanelActionRow
-                    icon={
-                      codeEditor.state.status === "starting" ||
-                      codeEditor.state.status === "stopping"
-                        ? Loader2
-                        : ExternalLink
-                    }
-                    label={codeEditor.menuLabel}
-                    detail={codeEditor.menuDetail ?? undefined}
-                    onClick={() => void codeEditor.handleOpen()}
-                    disabled={
-                      codeEditor.state.status === "starting" ||
-                      codeEditor.state.status === "stopping"
-                    }
-                  />
-                )}
-
-                <Separator className="my-1" />
-
-                {/* Archive / Unarchive */}
-                {isArchived ? (
-                  <PanelActionRow
-                    icon={ArchiveRestore}
-                    label={
-                      isUnarchiving
-                        ? "Unarchiving..."
-                        : isArchiveSnapshotPending
-                          ? "Pausing..."
-                          : "Unarchive"
-                    }
-                    onClick={onUnarchiveClick}
-                    disabled={isUnarchiving || isArchiveSnapshotPending}
-                  />
-                ) : (
-                  <PanelActionRow
-                    icon={Archive}
-                    label="Archive"
-                    onClick={onArchiveClick}
-                  />
-                )}
-              </div>
-            </PanelSection>
+              {!canRunDevServer && (
+                <div className="px-2 py-6 text-center text-xs text-muted-foreground">
+                  Sandbox is not active
+                </div>
+              )}
+            </div>
           </div>
         )}
 

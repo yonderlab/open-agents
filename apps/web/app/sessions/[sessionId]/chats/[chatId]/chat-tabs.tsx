@@ -12,19 +12,13 @@ import { useGitPanel } from "./git-panel-context";
 
 type ChatTabsProps = {
   activeChatId: string;
-  /** Whether diff data is available */
+  /** Whether diff data is available (controls whether the diff tab appears) */
   hasDiff: boolean;
-  /** +/- summary for the diff tab badge */
-  diffSummary?: {
-    totalAdditions: number;
-    totalDeletions: number;
-  } | null;
 };
 
 export function ChatTabs({
   activeChatId,
   hasDiff,
-  diffSummary,
 }: ChatTabsProps) {
   const { chats, createChat, switchChat } = useSessionLayout();
   const { activeView, setActiveView } = useGitPanel();
@@ -38,10 +32,6 @@ export function ChatTabs({
     e.stopPropagation();
     setActiveView("chat");
   };
-
-  const hasDiffChanges =
-    diffSummary &&
-    (diffSummary.totalAdditions > 0 || diffSummary.totalDeletions > 0);
 
   return (
     <div className="flex items-center gap-0 border-b border-border bg-muted/30 px-1">
@@ -92,16 +82,6 @@ export function ChatTabs({
           >
             <GitCompare className="h-3.5 w-3.5" />
             <span>Diff</span>
-            {hasDiffChanges && (
-              <span className="flex items-center gap-1 text-[10px]">
-                <span className="text-green-500">
-                  +{diffSummary.totalAdditions}
-                </span>
-                <span className="text-red-400">
-                  -{diffSummary.totalDeletions}
-                </span>
-              </span>
-            )}
             {/* Close button for diff tab */}
             {activeView === "diff" && (
               <span

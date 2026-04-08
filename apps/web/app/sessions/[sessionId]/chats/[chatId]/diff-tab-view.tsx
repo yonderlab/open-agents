@@ -2,24 +2,15 @@
 
 import { PatchDiff } from "@pierre/diffs/react";
 import {
-  ChevronDown,
-  ChevronRight,
+  ArrowLeft,
   FileText,
-  GitCommitHorizontal,
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DiffFile } from "@/app/api/sessions/[sessionId]/diff/route";
 import { useGitPanel } from "./git-panel-context";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   type DiffMode,
   useUserPreferences,
@@ -30,7 +21,6 @@ import { cn } from "@/lib/utils";
 import { useSessionChatWorkspaceContext } from "./session-chat-context";
 
 type DiffStyle = DiffMode;
-type DiffScope = "all" | "uncommitted";
 
 const wrappedDiffExtensions = new Set([".md", ".mdx", ".markdown", ".txt"]);
 
@@ -39,10 +29,6 @@ function shouldWrapDiffContent(filePath: string) {
   return [...wrappedDiffExtensions].some((extension) =>
     normalizedPath.endsWith(extension),
   );
-}
-
-function isUncommittedFile(file: DiffFile): boolean {
-  return file.stagingStatus === "unstaged" || file.stagingStatus === "partial";
 }
 
 function formatTimestamp(date: Date) {
@@ -98,171 +84,9 @@ function StatusBadge({ status }: { status: DiffFile["status"] }) {
   );
 }
 
-function StagingBadge({
-  stagingStatus,
-}: {
-  stagingStatus: DiffFile["stagingStatus"];
-}) {
-  if (!stagingStatus || stagingStatus === "staged") return null;
-
-  const styles = {
-    unstaged: "bg-orange-500/20 text-orange-700 dark:text-orange-400",
-    partial: "bg-purple-500/20 text-purple-700 dark:text-purple-400",
-  };
-
-  const labels = {
-    unstaged: "Unstaged",
-    partial: "Partial",
-  };
-
-  return (
-    <span
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-        styles[stagingStatus],
-      )}
-    >
-      {labels[stagingStatus]}
-    </span>
-  );
-}
-
-function FileEntry({
-  file,
-  isExpanded,
-  onToggle,
-  diffStyle,
-  fileRef,
-}: {
-  file: DiffFile;
-  isExpanded: boolean;
-  onToggle: () => void;
-  diffStyle: DiffStyle;
-  fileRef?: React.Ref<HTMLDivElement>;
-}) {
-  const fileName = file.path.split("/").pop() ?? file.path;
-  const dirPath = file.path.slice(0, -fileName.length);
-  const baseOptions =
-    diffStyle === "split" ? splitDiffOptions : defaultDiffOptions;
-  const options = shouldWrapDiffContent(file.path)
-    ? { ...baseOptions, overflow: "wrap" as const }
-    : baseOptions;
-  const isGenerated = file.generated === true;
-
-  return (
-    <div ref={fileRef} className="border-b border-border last:border-b-0">
-      <button
-        type="button"
-        onClick={isGenerated ? undefined : onToggle}
-        className={cn(
-          "flex w-full items-center gap-2 px-3 py-2 text-left",
-          isGenerated ? "cursor-default opacity-70" : "hover:bg-muted/50",
-        )}
-      >
-        {isGenerated ? (
-          <span className="h-4 w-4 shrink-0" />
-        ) : isExpanded ? (
-          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        )}
-        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="truncate text-sm">
-            {dirPath && (
-              <span className="text-muted-foreground">{dirPath}</span>
-            )}
-            <span className="font-medium text-foreground">{fileName}</span>
-          </span>
-          <StatusBadge status={file.status} />
-          <StagingBadge stagingStatus={file.stagingStatus} />
-          {isGenerated && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground bg-muted">
-              Generated
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-xs">
-          {file.additions > 0 && (
-            <span className="text-green-600 dark:text-green-500">
-              +{file.additions}
-            </span>
-          )}
-          {file.deletions > 0 && (
-            <span className="text-red-600 dark:text-red-400">
-              -{file.deletions}
-            </span>
-          )}
-        </div>
-      </button>
-
-      {isExpanded && !isGenerated && (
-        <div className="border-t border-border">
-          {file.diff ? (
-            <PatchDiff key={diffStyle} patch={file.diff} options={options} />
-          ) : (
-            <div className="px-4 py-3 text-xs text-muted-foreground">
-              No diff content available
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScopeDropdown({
-  scope,
-  onScopeChange,
-  uncommittedFileCount,
-}: {
-  scope: DiffScope;
-  onScopeChange: (scope: DiffScope) => void;
-  uncommittedFileCount: number;
-}) {
-  const label = scope === "all" ? "All changes" : "Uncommitted changes";
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs font-medium"
-        >
-          {scope === "uncommitted" && (
-            <GitCommitHorizontal className="h-3 w-3" />
-          )}
-          {label}
-          <ChevronDown className="h-3 w-3 opacity-50" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[200px]">
-        <DropdownMenuRadioGroup
-          value={scope}
-          onValueChange={(v) => onScopeChange(v as DiffScope)}
-        >
-          <DropdownMenuRadioItem value="all">All changes</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="uncommitted">
-            <div className="flex flex-col">
-              <span>Uncommitted changes</span>
-              {uncommittedFileCount > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {uncommittedFileCount} file
-                  {uncommittedFileCount !== 1 && "s"} changed
-                </span>
-              )}
-            </div>
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /**
- * Inline diff view that renders as a full-width tab replacement for the chat
- * messages area. Adapted from DiffViewer modal but without the Dialog wrapper.
+ * Shows a single file's diff, opened from the git panel's diff file list.
+ * No multi-file view, no collapse — just the file header + patch.
  */
 export function DiffTabView() {
   const {
@@ -274,55 +98,18 @@ export function DiffTabView() {
     sandboxInfo,
     refreshDiff,
   } = useSessionChatWorkspaceContext();
-  const { focusedDiffFile, setFocusedDiffFile } = useGitPanel();
+  const { focusedDiffFile, setFocusedDiffFile, setActiveView } = useGitPanel();
   const isMobile = useIsMobile();
   const { preferences } = useUserPreferences();
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [diffStyle, setDiffStyle] = useState<DiffStyle>("unified");
-  const [scope, setScope] = useState<DiffScope>("all");
-  const fileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const filteredFiles = useMemo(() => {
-    if (!diff) return [];
-    if (scope === "all") return diff.files;
-    return diff.files.filter(isUncommittedFile);
-  }, [diff, scope]);
-
-  const filteredSummary = useMemo(() => {
-    if (scope === "all" && diff) return diff.summary;
-    return {
-      totalFiles: filteredFiles.length,
-      totalAdditions: filteredFiles.reduce((sum, f) => sum + f.additions, 0),
-      totalDeletions: filteredFiles.reduce((sum, f) => sum + f.deletions, 0),
-    };
-  }, [scope, diff, filteredFiles]);
-
-  const uncommittedFileCount = useMemo(() => {
-    if (!diff) return 0;
-    return diff.files.filter(isUncommittedFile).length;
-  }, [diff]);
+  // Find the focused file in the diff data
+  const file = useMemo(() => {
+    if (!diff || !focusedDiffFile) return null;
+    return diff.files.find((f) => f.path === focusedDiffFile) ?? null;
+  }, [diff, focusedDiffFile]);
 
   const showStaleIndicator = !sandboxInfo && diff !== null;
-
-  const toggleFile = (path: string) => {
-    setExpandedFiles((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  };
-
-  const expandAll = () => {
-    setExpandedFiles(new Set(filteredFiles.map((f) => f.path)));
-  };
-
-  const collapseAll = () => {
-    setExpandedFiles(new Set());
-  };
 
   useEffect(() => {
     if (isMobile) {
@@ -332,64 +119,54 @@ export function DiffTabView() {
     setDiffStyle(preferences?.defaultDiffMode ?? "unified");
   }, [isMobile, preferences?.defaultDiffMode]);
 
-  useEffect(() => {
-    setExpandedFiles(new Set());
-  }, [scope]);
+  const baseOptions =
+    diffStyle === "split" ? splitDiffOptions : defaultDiffOptions;
 
-  // When a file is focused (from the git panel diff tab), expand it and scroll to it
-  useEffect(() => {
-    if (!focusedDiffFile || !diff) return;
+  const handleBack = () => {
+    setActiveView("chat");
+  };
 
-    // Expand the focused file
-    setExpandedFiles((prev) => {
-      const next = new Set(prev);
-      next.add(focusedDiffFile);
-      return next;
-    });
-
-    // Wait a tick for the DOM to update, then scroll
-    const timeoutId = setTimeout(() => {
-      const el = fileRefs.current.get(focusedDiffFile);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-      // Clear the focused file after scrolling
-      setFocusedDiffFile(null);
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [focusedDiffFile, diff, setFocusedDiffFile]);
-
-  const setFileRef = useCallback(
-    (path: string) => (el: HTMLDivElement | null) => {
-      if (el) {
-        fileRefs.current.set(path, el);
-      } else {
-        fileRefs.current.delete(path);
-      }
-    },
-    [],
-  );
+  // If there's no focused file yet (e.g. user clicked the diff tab directly), show a placeholder
+  if (!focusedDiffFile) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+        <FileText className="h-8 w-8" />
+        <p className="text-sm">Select a file from the Diff panel to view changes</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium">Changes</span>
-          <ScopeDropdown
-            scope={scope}
-            onScopeChange={setScope}
-            uncommittedFileCount={uncommittedFileCount}
-          />
-          {filteredSummary.totalFiles > 0 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-green-600 dark:text-green-500">
-                +{filteredSummary.totalAdditions}
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 px-0"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {file && (
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate text-sm font-medium">
+                {file.path}
               </span>
-              <span className="text-red-600 dark:text-red-400">
-                -{filteredSummary.totalDeletions}
-              </span>
+              <StatusBadge status={file.status} />
+              <div className="flex items-center gap-1.5 text-xs">
+                {file.additions > 0 && (
+                  <span className="text-green-600 dark:text-green-500">
+                    +{file.additions}
+                  </span>
+                )}
+                {file.deletions > 0 && (
+                  <span className="text-red-600 dark:text-red-400">
+                    -{file.deletions}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -432,26 +209,6 @@ export function DiffTabView() {
               Split
             </button>
           </div>
-          {filteredFiles.length > 0 && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={expandAll}
-                className="hidden h-7 px-2 text-xs sm:inline-flex"
-              >
-                Expand all
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={collapseAll}
-                className="hidden h-7 px-2 text-xs sm:inline-flex"
-              >
-                Collapse
-              </Button>
-            </>
-          )}
         </div>
       </div>
 
@@ -478,49 +235,38 @@ export function DiffTabView() {
           </div>
         )}
 
-        {!diffLoading && !diffError && diff && filteredFiles.length === 0 && (
+        {!diffLoading && !diffError && !file && (
           <div className="px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              {scope === "uncommitted"
-                ? "No uncommitted changes"
-                : "No changes detected"}
+              File not found in diff
             </p>
           </div>
         )}
 
-        {!diffLoading && !diffError && filteredFiles.length > 0 && (
+        {!diffLoading && !diffError && file && (
           <div>
-            {filteredFiles.map((file) => (
-              <FileEntry
-                key={file.path}
-                file={file}
-                isExpanded={expandedFiles.has(file.path)}
-                onToggle={() => toggleFile(file.path)}
-                diffStyle={diffStyle}
-                fileRef={setFileRef(file.path)}
+            {file.generated ? (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                Generated file — diff content hidden
+              </div>
+            ) : file.diff ? (
+              <PatchDiff
+                key={`${file.path}-${diffStyle}`}
+                patch={file.diff}
+                options={
+                  shouldWrapDiffContent(file.path)
+                    ? { ...baseOptions, overflow: "wrap" as const }
+                    : baseOptions
+                }
               />
-            ))}
+            ) : (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                No diff content available
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      {filteredFiles.length > 0 && (
-        <div className="flex shrink-0 items-center justify-between border-t border-border px-4 py-2 text-xs text-muted-foreground">
-          <span>
-            {filteredSummary.totalFiles} file
-            {filteredSummary.totalFiles !== 1 && "s"} changed
-          </span>
-          {diff?.baseRef && (
-            <span>
-              vs{" "}
-              <span className="font-mono text-foreground/70">
-                {diff.baseRef}
-              </span>
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }

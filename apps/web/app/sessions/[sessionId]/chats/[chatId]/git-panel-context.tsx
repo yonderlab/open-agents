@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type GitPanelTab = "info" | "diff" | "checks";
+export type GitPanelTab = "code" | "diff" | "checks";
 export type ActiveView = "chat" | "diff";
 
 type GitPanelContextValue = {
@@ -40,7 +40,7 @@ const GitPanelContext = createContext<GitPanelContextValue | undefined>(
 
 export function GitPanelProvider({ children }: { children: ReactNode }) {
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
-  const [gitPanelTab, setGitPanelTab] = useState<GitPanelTab>("info");
+  const [gitPanelTab, setGitPanelTab] = useState<GitPanelTab>("code");
   const [activeView, setActiveView] = useState<ActiveView>("chat");
   const [focusedDiffFile, setFocusedDiffFile] = useState<string | null>(null);
 

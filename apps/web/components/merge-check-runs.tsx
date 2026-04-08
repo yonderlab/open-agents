@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Check,
   ChevronDown,
@@ -282,21 +282,9 @@ export function CheckRunsList({
     checks?.failed ?? checkRuns.filter((c) => c.state === "failed").length;
   const total = passed + pending + failed;
 
-  const allPassing = failed === 0 && pending === 0 && total > 0;
-
   const [groupMode, setGroupMode] = useState<GroupMode>("status");
-  // Start closed — open once on first data load if not all passing
-  const [detailsOpen, setDetailsOpen] = useState(false);
-
-  const hasReceivedData = useRef(false);
-  useEffect(() => {
-    if (total > 0 && !hasReceivedData.current) {
-      hasReceivedData.current = true;
-      if (!allPassing) {
-        setDetailsOpen(true);
-      }
-    }
-  }, [total, allPassing]);
+  // Always start open so checks are visible in the panel
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   // Count distinct states present
   const distinctStates = useMemo(() => {

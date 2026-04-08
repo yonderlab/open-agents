@@ -2691,25 +2691,27 @@ export function SessionChatContent({
 
   return (
     <>
-      {/* Header */}
-      <SessionHeader
-        session={session}
-        chatId={chatInfo.id}
-        sandboxInfo={sandboxInfo}
-        isSandboxActive={isSandboxActive}
-        isCreatingSandbox={isCreatingSandbox}
-        isRestoringSnapshot={isRestoringSnapshot}
-        isReconnectingSandbox={isReconnectingSandbox}
-        isHibernating={isHibernatingUi}
-        onShareClick={() => setMobileShareOpen(true)}
-      />
+    <div className="flex h-full overflow-hidden">
+      {/* Left column: header + tabs + content */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <SessionHeader
+          session={session}
+          chatId={chatInfo.id}
+          sandboxInfo={sandboxInfo}
+          isSandboxActive={isSandboxActive}
+          isCreatingSandbox={isCreatingSandbox}
+          isRestoringSnapshot={isRestoringSnapshot}
+          isReconnectingSandbox={isReconnectingSandbox}
+          isHibernating={isHibernatingUi}
+          onShareClick={() => setMobileShareOpen(true)}
+        />
 
-      {/* Chat tabs */}
-      <ChatTabs
-        activeChatId={chatInfo.id}
-        hasDiff={supportsDiff && Boolean(diff || session.cachedDiff)}
-        diffSummary={diff?.summary ?? null}
-      />
+        {/* Chat tabs */}
+        <ChatTabs
+          activeChatId={chatInfo.id}
+          hasDiff={supportsDiff && Boolean(diff || session.cachedDiff)}
+        />
 
       {/* Share dialog (triggered from header) */}
       <ShareDialog
@@ -2753,9 +2755,7 @@ export function SessionChatContent({
         </DialogContent>
       </Dialog>
 
-      {/* Main content area with optional git panel */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left side: chat or diff */}
+        {/* Main content: chat or diff */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {activeView === "diff" ? (
             <DiffTabView />
@@ -3617,9 +3617,10 @@ export function SessionChatContent({
             </>
           )}
         </div>
+      </div>
 
-        {/* Git panel */}
-        <GitPanel
+      {/* Git panel — full height right column */}
+      <GitPanel
           session={session}
           hasRepo={hasRepo}
           hasExistingPr={hasExistingPr}
@@ -3630,7 +3631,6 @@ export function SessionChatContent({
           commitActionLabel={commitActionLabel}
           hasUncommittedGitChanges={hasUncommittedGitChanges}
           canMergeAndArchive={canMergeAndArchive}
-          canCloseAndArchive={canCloseAndArchive}
           supportsRepoCreation={supportsRepoCreation}
           supportsDiff={supportsDiff}
           hasDiff={Boolean(diff || session.cachedDiff)}
@@ -3639,7 +3639,6 @@ export function SessionChatContent({
           prDeploymentUrl={prDeploymentUrl}
           isDeploymentStale={isDeploymentStale}
           buildingDeploymentUrl={buildingDeploymentUrl}
-          isArchived={isArchived}
           canRunDevServer={canRunDevServer}
           devServer={devServer}
           codeEditor={codeEditor}
@@ -3647,21 +3646,7 @@ export function SessionChatContent({
           diffSummary={diff?.summary ?? null}
           onCommitClick={() => setCommitDialogOpen(true)}
           onCreatePrClick={() => setPrDialogOpen(true)}
-          onCloseClick={() => setCloseDialogOpen(true)}
           onCreateRepoClick={() => setRepoDialogOpen(true)}
-          onArchiveClick={() => setMobileArchiveDialogOpen(true)}
-          onUnarchiveClick={() => {
-            setIsUnarchiving(true);
-            void unarchiveSession()
-              .catch((error: unknown) => {
-                console.error("Failed to unarchive session:", error);
-              })
-              .finally(() => {
-                setIsUnarchiving(false);
-              });
-          }}
-          isUnarchiving={isUnarchiving}
-          isArchiveSnapshotPending={isArchiveSnapshotPending}
           onOpenPreview={
             isDeploymentStale && buildingDeploymentUrl
               ? openBuildingDeployment
@@ -3697,7 +3682,7 @@ export function SessionChatContent({
             void sendMessageWithPendingState({ text });
           }}
         />
-      </div>
+    </div>
 
       {/* Create PR Dialog */}
       {session && (
