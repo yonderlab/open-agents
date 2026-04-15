@@ -12,7 +12,11 @@ import { useSession } from "@/hooks/use-session";
 import { estimateModelUsageCost, type AvailableModel } from "@/lib/models";
 import { fetcher } from "@/lib/swr";
 import { formatDateOnly } from "@/lib/usage/date-range";
-import type { UsageInsights, UsageRepositoryInsight } from "@/lib/usage/types";
+import type {
+  UsageDomainLeaderboard,
+  UsageInsights,
+  UsageRepositoryInsight,
+} from "@/lib/usage/types";
 import { UsageInsightsSection } from "../usage/usage-insights-section";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -51,7 +55,7 @@ interface ModelUsage {
 interface UsageResponse {
   usage: DailyUsageRow[];
   insights: UsageInsights;
-  domainLeaderboard: unknown;
+  domainLeaderboard: UsageDomainLeaderboard | null;
 }
 
 interface ModelsResponse {
@@ -324,6 +328,7 @@ function ProfileSidebar({
   totals,
   topRepos,
   estimatedCostValue,
+  vercelRank,
 }: {
   totals: {
     inputTokens: number;
@@ -333,6 +338,7 @@ function ProfileSidebar({
   } | null;
   topRepos: UsageRepositoryInsight[] | null;
   estimatedCostValue: string;
+  vercelRank: number | null;
 }) {
   const { session, loading } = useSession();
 
@@ -384,7 +390,9 @@ function ProfileSidebar({
 
       {/* Rank + Email */}
       <div className="space-y-1">
-        <p className="text-sm font-medium text-foreground">#1 in Vercel</p>
+        <p className="text-sm font-medium text-foreground">
+          {vercelRank ? `#${vercelRank} in Vercel` : "Vercel rank unavailable"}
+        </p>
         {session.user.email && (
           <p className="truncate text-sm text-muted-foreground">
             {session.user.email}
@@ -423,6 +431,7 @@ function ProfileSidebar({
 
 export default function ProfilePage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const { session } = useSession();
 
   const filteredUsagePath = useMemo(() => {
     if (!dateRange?.from) return null;
@@ -534,6 +543,16 @@ export default function ProfilePage() {
     : null;
 
   const topRepos = data?.insights?.topRepositories ?? null;
+  const vercelRank = useMemo(() => {
+    const leaderboard = fullData?.domainLeaderboard;
+    const userId = session?.user?.id;
+    if (!leaderboard || !userId) {
+      return null;
+    }
+
+    const index = leaderboard.rows.findIndex((row) => row.userId === userId);
+    return index >= 0 ? index + 1 : null;
+  }, [fullData?.domainLeaderboard, session?.user?.id]);
 
   return (
     <>
@@ -545,6 +564,7 @@ export default function ProfilePage() {
             totals={isLoading ? null : totals}
             topRepos={isLoading ? null : topRepos}
             estimatedCostValue={estimatedCostValue}
+            vercelRank={vercelRank}
           />
         </div>
 
