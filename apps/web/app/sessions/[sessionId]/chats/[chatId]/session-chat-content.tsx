@@ -3512,53 +3512,70 @@ export function SessionChatContent({
                                           >
                                             {p.text}
                                           </Streamdown>
-                                          {canCopyAssistantMessage && (
-                                            <div className="mt-1 flex justify-start">
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    void handleCopyAssistantMessage(
-                                                      m.id,
-                                                      p.text,
-                                                    )
-                                                  }
-                                                  aria-label="Copy assistant response"
-                                                  className="rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
-                                                >
-                                                  {copiedAssistantMessageId ===
-                                                  m.id ? (
-                                                    <Check className="h-4 w-4" />
-                                                  ) : (
-                                                    <Copy className="h-4 w-4" />
-                                                  )}
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    void handleForkAssistantMessage(
-                                                      m.id,
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    forkingAssistantMessageId !==
-                                                    null
-                                                  }
-                                                  aria-label="Fork conversation from this response"
-                                                  className={cn(
-                                                    "rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-40",
-                                                    forkingAssistantMessageId ===
-                                                      m.id && "opacity-100",
-                                                  )}
-                                                >
-                                                  {forkingAssistantMessageId ===
-                                                  m.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                  ) : (
-                                                    <GitBranch className="h-4 w-4" />
-                                                  )}
-                                                </button>
-                                              </div>
+                                          {(canCopyAssistantMessage ||
+                                            (!isMessageStreaming &&
+                                              isFinalAssistantTextPart &&
+                                              m.metadata)) && (
+                                            <div className="mt-1 flex items-center justify-start">
+                                              {canCopyAssistantMessage && (
+                                                <div className="flex items-center gap-1">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      void handleCopyAssistantMessage(
+                                                        m.id,
+                                                        p.text,
+                                                      )
+                                                    }
+                                                    aria-label="Copy assistant response"
+                                                    className="rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                                                  >
+                                                    {copiedAssistantMessageId ===
+                                                    m.id ? (
+                                                      <Check className="h-4 w-4" />
+                                                    ) : (
+                                                      <Copy className="h-4 w-4" />
+                                                    )}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      void handleForkAssistantMessage(
+                                                        m.id,
+                                                      )
+                                                    }
+                                                    disabled={
+                                                      forkingAssistantMessageId !==
+                                                      null
+                                                    }
+                                                    aria-label="Fork conversation from this response"
+                                                    className={cn(
+                                                      "rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-40",
+                                                      forkingAssistantMessageId ===
+                                                        m.id && "opacity-100",
+                                                    )}
+                                                  >
+                                                    {forkingAssistantMessageId ===
+                                                    m.id ? (
+                                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                      <GitBranch className="h-4 w-4" />
+                                                    )}
+                                                  </button>
+                                                </div>
+                                              )}
+                                              {!isMessageStreaming &&
+                                                isFinalAssistantTextPart &&
+                                                m.metadata && (
+                                                  <span className="opacity-0 transition group-hover:opacity-100">
+                                                    <MessageModelPill
+                                                      metadata={m.metadata}
+                                                      modelOptions={
+                                                        modelOptions
+                                                      }
+                                                    />
+                                                  </span>
+                                                )}
                                             </div>
                                           )}
                                         </div>
@@ -3714,35 +3731,24 @@ export function SessionChatContent({
 
                             if (m.role === "assistant") {
                               return (
-                                <div key={m.id}>
-                                  <AssistantMessageGroups
-                                    message={m}
-                                    isStreaming={isMessageStreaming}
-                                    durationMs={
-                                      messageDurationMap[m.id] ?? null
-                                    }
-                                    startedAt={
-                                      messageStartedAtMap[m.id] ??
-                                      (isMessageStreaming
-                                        ? lastSendTimestampRef.current
-                                          ? new Date(
-                                              lastSendTimestampRef.current,
-                                            ).toISOString()
-                                          : lastUserMessageSentAt
-                                        : null)
-                                    }
-                                  >
-                                    {renderGroups}
-                                  </AssistantMessageGroups>
-                                  {!isMessageStreaming && m.metadata && (
-                                    <div className="mt-1">
-                                      <MessageModelPill
-                                        metadata={m.metadata}
-                                        modelOptions={modelOptions}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
+                                <AssistantMessageGroups
+                                  key={m.id}
+                                  message={m}
+                                  isStreaming={isMessageStreaming}
+                                  durationMs={messageDurationMap[m.id] ?? null}
+                                  startedAt={
+                                    messageStartedAtMap[m.id] ??
+                                    (isMessageStreaming
+                                      ? lastSendTimestampRef.current
+                                        ? new Date(
+                                            lastSendTimestampRef.current,
+                                          ).toISOString()
+                                        : lastUserMessageSentAt
+                                      : null)
+                                  }
+                                >
+                                  {renderGroups}
+                                </AssistantMessageGroups>
                               );
                             }
 
