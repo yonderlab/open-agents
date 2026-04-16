@@ -68,6 +68,7 @@ import { useInlineQuestion } from "@/components/inline-question-input";
 import { SlashCommandDropdown } from "@/components/slash-command-dropdown";
 import { SnippetChip } from "@/components/snippet-chip";
 import { AssistantMessageGroups } from "@/components/assistant-message-groups";
+import { MessageModelPill } from "@/components/message-model-pill";
 import {
   PinnedTodoPanel,
   getLatestTodos,
@@ -3713,24 +3714,35 @@ export function SessionChatContent({
 
                             if (m.role === "assistant") {
                               return (
-                                <AssistantMessageGroups
-                                  key={m.id}
-                                  message={m}
-                                  isStreaming={isMessageStreaming}
-                                  durationMs={messageDurationMap[m.id] ?? null}
-                                  startedAt={
-                                    messageStartedAtMap[m.id] ??
-                                    (isMessageStreaming
-                                      ? lastSendTimestampRef.current
-                                        ? new Date(
-                                            lastSendTimestampRef.current,
-                                          ).toISOString()
-                                        : lastUserMessageSentAt
-                                      : null)
-                                  }
-                                >
-                                  {renderGroups}
-                                </AssistantMessageGroups>
+                                <div key={m.id}>
+                                  <AssistantMessageGroups
+                                    message={m}
+                                    isStreaming={isMessageStreaming}
+                                    durationMs={
+                                      messageDurationMap[m.id] ?? null
+                                    }
+                                    startedAt={
+                                      messageStartedAtMap[m.id] ??
+                                      (isMessageStreaming
+                                        ? lastSendTimestampRef.current
+                                          ? new Date(
+                                              lastSendTimestampRef.current,
+                                            ).toISOString()
+                                          : lastUserMessageSentAt
+                                        : null)
+                                    }
+                                  >
+                                    {renderGroups}
+                                  </AssistantMessageGroups>
+                                  {!isMessageStreaming && m.metadata && (
+                                    <div className="mt-1">
+                                      <MessageModelPill
+                                        metadata={m.metadata}
+                                        modelOptions={modelOptions}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                               );
                             }
 
