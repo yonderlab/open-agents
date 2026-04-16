@@ -339,26 +339,31 @@ export function AccountsSection() {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-border/50 bg-muted/10">
-        <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <GitHubIcon className="h-5 w-5" />
-            <span className="text-sm font-medium">GitHub</span>
+        <div className="border-b border-border/50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <GitHubIcon className="h-5 w-5" />
+              <span className="text-sm font-medium">GitHub</span>
+            </div>
+            {hasGitHub && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={
+                  isRefreshing || connectionLoading || connectionStatusLoading
+                }
+                className="h-7 w-7 p-0"
+              >
+                <RefreshCw
+                  className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+              </Button>
+            )}
           </div>
-          {hasGitHub && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={
-                isRefreshing || connectionLoading || connectionStatusLoading
-              }
-              className="h-7 w-7 p-0"
-            >
-              <RefreshCw
-                className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-            </Button>
-          )}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Open Agents uses a GitHub App to access your repositories
+          </p>
         </div>
 
         <div className="space-y-4 p-4">
