@@ -14,6 +14,8 @@ const MODELS_DEV_TIMEOUT_MS = 750;
 
 const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_API_VERSION = "2023-06-01";
+// Higher than the models.dev enrichment timeout: the Anthropic list is the
+// primary source, so we'd rather wait than serve an empty picker.
 const ANTHROPIC_FETCH_TIMEOUT_MS = 3000;
 
 type GatewayModel = GatewayAvailableModel;
