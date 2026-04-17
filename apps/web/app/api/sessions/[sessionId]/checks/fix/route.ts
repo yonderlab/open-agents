@@ -5,7 +5,8 @@ import {
 import type { PullRequestCheckRun } from "@/lib/github/client";
 import { getUserGitHubToken } from "@/lib/github/user-token";
 import { Octokit } from "@octokit/rest";
-import { gateway, generateText } from "ai";
+import { generateText } from "ai";
+import { model } from "@open-harness/agent";
 
 type RouteContext = {
   params: Promise<{ sessionId: string }>;
@@ -159,7 +160,7 @@ async function compactLog(rawLog: string): Promise<string> {
   }
 
   const result = await generateText({
-    model: gateway("anthropic/claude-haiku-4.5"),
+    model: model("anthropic/claude-haiku-4.5"),
     system: LOG_SUMMARIZATION_PROMPT,
     prompt: logInput,
   });
