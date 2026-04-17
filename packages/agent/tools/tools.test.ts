@@ -6,6 +6,14 @@ import type { ToolNeedsApprovalFunction } from "./utils";
 
 const sandboxRegistry = new Map<string, Record<string, unknown>>();
 
+mock.module("@ai-sdk/anthropic", () => ({
+  createAnthropic: () => (modelId: string) => ({ modelId }),
+}));
+
+mock.module("@ai-sdk/openai", () => ({
+  createOpenAI: () => (modelId: string) => ({ modelId }),
+}));
+
 mock.module("ai", () => {
   class MockToolLoopAgent {
     constructor(_config: unknown) {}
@@ -17,11 +25,15 @@ mock.module("ai", () => {
     }
   }
 
-  const gateway = (modelId: string) => ({ modelId });
-
   return {
     tool: <T extends Record<string, unknown>>(definition: T) => definition,
-    gateway,
+    createProviderRegistry: () => ({
+      languageModel: (modelId: string) => ({ modelId }),
+    }),
+    defaultSettingsMiddleware: (_settings: unknown) => ({
+      kind: "default-settings-middleware",
+    }),
+    wrapLanguageModel: ({ model }: { model: unknown }) => model,
     stepCountIs: (count: number) => ({ count }),
     ToolLoopAgent: MockToolLoopAgent,
     getToolName: (part: { toolName?: string; type?: string }) => {
