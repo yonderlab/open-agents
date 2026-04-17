@@ -6,7 +6,7 @@ import {
   createProviderRegistry,
   defaultSettingsMiddleware,
   wrapLanguageModel,
-  type GatewayModelId,
+  type GatewayModelId as ProviderModelId,
   type JSONValue,
   type LanguageModel,
 } from "ai";
@@ -89,7 +89,7 @@ export interface ModelOptions {
   providerOptionsOverrides?: ProviderOptionsByProvider;
 }
 
-export type { GatewayModelId, LanguageModel, JSONValue };
+export type { ProviderModelId, LanguageModel, JSONValue };
 
 export function shouldApplyOpenAIReasoningDefaults(modelId: string): boolean {
   return modelId.startsWith("openai/gpt-5");
@@ -161,7 +161,7 @@ export function getProviderOptionsForModel(
 
 // Vercel's AI Gateway uses dotted version suffixes (e.g. "claude-opus-4.6")
 // while provider SDKs expect hyphen-separated IDs (e.g. "claude-opus-4-6").
-// Normalize so existing GatewayModelId strings keep working when routed directly.
+// Normalize so existing provider-prefixed ids keep working when routed directly.
 function normalizeModelIdForProvider(providerModelId: string): string {
   return providerModelId.replaceAll(".", "-");
 }
@@ -180,7 +180,7 @@ const registry = createProviderRegistry(
 );
 
 export function model(
-  modelId: GatewayModelId,
+  modelId: ProviderModelId,
   options: ModelOptions = {},
 ): LanguageModel {
   const { providerOptionsOverrides } = options;

@@ -3,7 +3,7 @@ import { stepCountIs, ToolLoopAgent, type ToolSet } from "ai";
 import { z } from "zod";
 import { addCacheControl } from "./context-management";
 import {
-  type GatewayModelId,
+  type ProviderModelId,
   model,
   type ProviderOptionsByProvider,
 } from "./models";
@@ -25,11 +25,11 @@ import {
 } from "./tools";
 
 export interface AgentModelSelection {
-  id: GatewayModelId;
+  id: ProviderModelId;
   providerOptionsOverrides?: ProviderOptionsByProvider;
 }
 
-export type OpenHarnessAgentModelInput = GatewayModelId | AgentModelSelection;
+export type OpenHarnessAgentModelInput = ProviderModelId | AgentModelSelection;
 
 export interface AgentSandboxContext {
   state: SandboxState;
@@ -53,7 +53,7 @@ export const defaultModel = model(defaultModelLabel);
 
 function normalizeAgentModelSelection(
   selection: OpenHarnessAgentModelInput | undefined,
-  fallbackId: GatewayModelId,
+  fallbackId: ProviderModelId,
 ): AgentModelSelection {
   if (!selection) {
     return { id: fallbackId };
