@@ -46,14 +46,24 @@ export function model(
 
 **Kept:** `GatewayModelId` re-export (the AI SDK's string union of `"provider/model"` IDs remains accurate for the registry).
 
-Call sites update their imports from `gateway` to `model` (~6 files):
+Call sites update their imports to `model` from `@open-harness/agent`. Note that many sites currently import `gateway` directly from the `"ai"` package (Vercel's gateway) rather than through our wrapper — these need to switch to our unified `model()` function so they pick up provider-option defaults (thinking config, `store: false`, etc.) instead of bypassing them.
 
-- `packages/agent/open-harness-agent.ts`
-- `apps/web/app/api/generate-title/route.ts`
-- `apps/web/app/api/generate-pr/route.ts`
-- `apps/web/app/api/sessions/[sessionId]/generate-commit-message/route.ts`
-- `apps/web/lib/chat/auto-commit-direct.ts`
+**Files currently importing from `@open-harness/agent` (2):**
 - `apps/web/lib/git/pr-content.ts`
+- `apps/web/lib/chat/auto-commit-direct.ts`
+
+**Files currently importing `gateway` from `"ai"` directly — must switch to `model` from `@open-harness/agent` (8):**
+- `apps/web/app/api/generate-pr/route.ts`
+- `apps/web/app/api/generate-title/route.ts`
+- `apps/web/app/api/sessions/[sessionId]/generate-commit-message/route.ts`
+- `apps/web/app/api/sessions/[sessionId]/checks/fix/route.ts`
+- `apps/web/app/api/github/create-repo/_lib/create-repo-workflow.ts`
+- `packages/agent/subagents/design.ts`
+- `packages/agent/subagents/explorer.ts`
+- `packages/agent/subagents/executor.ts`
+
+**Internal to `packages/agent` (self-references, use local import):**
+- `packages/agent/open-harness-agent.ts` (3 call sites)
 
 ## Provider Options & Middleware
 
