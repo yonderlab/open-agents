@@ -194,7 +194,8 @@ export function model(
     );
   }
 
-  const normalizedId = `${providerId}/${normalizeModelIdForProvider(providerModelId)}` as const;
+  const normalizedId =
+    `${providerId}/${normalizeModelIdForProvider(providerModelId)}` as const;
 
   let resolved: LanguageModel = registry.languageModel(
     normalizedId as Parameters<typeof registry.languageModel>[0],
