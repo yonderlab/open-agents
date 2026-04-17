@@ -4,7 +4,7 @@ import { z } from "zod";
 import { addCacheControl } from "./context-management";
 import {
   type GatewayModelId,
-  gateway,
+  model,
   type ProviderOptionsByProvider,
 } from "./models";
 
@@ -49,7 +49,7 @@ const callOptionsSchema = z.object({
 export type OpenHarnessAgentCallOptions = z.infer<typeof callOptionsSchema>;
 
 export const defaultModelLabel = "anthropic/claude-opus-4.6" as const;
-export const defaultModel = gateway(defaultModelLabel);
+export const defaultModel = model(defaultModelLabel);
 
 function normalizeAgentModelSelection(
   selection: OpenHarnessAgentModelInput | undefined,
@@ -103,11 +103,11 @@ export const openHarnessAgent = new ToolLoopAgent({
       ? normalizeAgentModelSelection(options.subagentModel, defaultModelLabel)
       : undefined;
 
-    const callModel = gateway(mainSelection.id, {
+    const callModel = model(mainSelection.id, {
       providerOptionsOverrides: mainSelection.providerOptionsOverrides,
     });
     const subagentModel = subagentSelection
-      ? gateway(subagentSelection.id, {
+      ? model(subagentSelection.id, {
           providerOptionsOverrides: subagentSelection.providerOptionsOverrides,
         })
       : undefined;
