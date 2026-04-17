@@ -1,17 +1,15 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-interface MockGatewayModel extends Record<string, unknown> {
+interface AnthropicApiModel {
   id: string;
-  name?: string;
-  description?: string | null;
-  modelType: string;
-  context_window?: number;
+  display_name?: string;
+  type?: string;
 }
 
-const gatewayModels: MockGatewayModel[] = [];
+const anthropicModels: AnthropicApiModel[] = [];
 const requestedUrls: string[] = [];
 
-let gatewayError: unknown = null;
+let anthropicStatus = 200;
 let modelsDevApiData: unknown = {};
 let currentSession: {
   authProvider?: "vercel" | "github";
@@ -19,6 +17,7 @@ let currentSession: {
 } | null = null;
 
 const originalFetch = globalThis.fetch;
+const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
 function getRequestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") {
@@ -30,18 +29,6 @@ function getRequestUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-mock.module("ai", () => ({
-  gateway: {
-    getAvailableModels: async () => {
-      if (gatewayError) {
-        throw gatewayError;
-      }
-
-      return { models: gatewayModels };
-    },
-  },
-}));
-
 mock.module("server-only", () => ({}));
 
 mock.module("@/lib/session/get-server-session", () => ({
@@ -52,18 +39,35 @@ const routeModulePromise = import("./route");
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalAnthropicApiKey === undefined) {
+    delete process.env.ANTHROPIC_API_KEY;
+  } else {
+    process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+  }
 });
 
 describe("/api/models context window enrichment", () => {
   beforeEach(() => {
-    gatewayModels.length = 0;
+    anthropicModels.length = 0;
     requestedUrls.length = 0;
-    gatewayError = null;
+    anthropicStatus = 200;
     modelsDevApiData = {};
     currentSession = null;
+    process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
 
     globalThis.fetch = mock((input: RequestInfo | URL, _init?: RequestInit) => {
-      requestedUrls.push(getRequestUrl(input));
+      const url = getRequestUrl(input);
+      requestedUrls.push(url);
+
+      if (url.startsWith("https://api.anthropic.com/v1/models")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: anthropicModels }), {
+            status: anthropicStatus,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
       return Promise.resolve(
         new Response(JSON.stringify(modelsDevApiData), {
           status: 200,
@@ -73,42 +77,28 @@ describe("/api/models context window enrichment", () => {
     }) as unknown as typeof fetch;
   });
 
-  test("overrides gateway context windows from models.dev", async () => {
-    gatewayModels.push(
+  test("enriches anthropic models with context windows from models.dev", async () => {
+    anthropicModels.push(
       {
-        id: "openai/gpt-5.3-codex",
-        modelType: "language",
-        context_window: 200_000,
+        id: "claude-opus-4-6",
+        display_name: "Claude Opus 4.6",
+        type: "model",
       },
       {
-        id: "anthropic/claude-opus-4.6",
-        modelType: "language",
-        context_window: 200_000,
-      },
-      {
-        id: "openai/gpt-4o-mini",
-        modelType: "language",
-        context_window: 128_000,
-      },
-      {
-        id: "openai/image-gen",
-        modelType: "image",
-        context_window: 200_000,
+        id: "claude-haiku-4-5",
+        display_name: "Claude Haiku 4.5",
+        type: "model",
       },
     );
 
     modelsDevApiData = {
-      openai: {
-        models: {
-          "gpt-5.3-codex": {
-            limit: { context: 400_000 },
-          },
-        },
-      },
       anthropic: {
         models: {
-          "claude-opus-4.6": {
+          "claude-opus-4-6": {
             limit: { context: 1_000_000 },
+          },
+          "claude-haiku-4-5": {
+            limit: { context: 200_000 },
           },
         },
       },
@@ -126,22 +116,23 @@ describe("/api/models context window enrichment", () => {
       body.models.map((model) => [model.id, model.context_window]),
     );
 
-    expect(contextById.get("openai/gpt-5.3-codex")).toBe(400_000);
-    expect(contextById.get("anthropic/claude-opus-4.6")).toBe(1_000_000);
-    expect(contextById.get("openai/gpt-4o-mini")).toBe(128_000);
-    expect(contextById.has("openai/image-gen")).toBe(false);
+    expect(contextById.get("anthropic/claude-opus-4-6")).toBe(1_000_000);
+    expect(contextById.get("anthropic/claude-haiku-4-5")).toBe(200_000);
+    expect(requestedUrls).toContain("https://api.anthropic.com/v1/models");
     expect(requestedUrls).toContain("https://models.dev/api.json");
   });
 
   test("hides Claude Opus models for managed trial users", async () => {
-    gatewayModels.push(
+    anthropicModels.push(
       {
-        id: "anthropic/claude-opus-4.6",
-        modelType: "language",
+        id: "claude-opus-4-6",
+        display_name: "Claude Opus 4.6",
+        type: "model",
       },
       {
-        id: "anthropic/claude-haiku-4.5",
-        modelType: "language",
+        id: "claude-haiku-4-5",
+        display_name: "Claude Haiku 4.5",
+        type: "model",
       },
     );
     currentSession = {
@@ -158,55 +149,22 @@ describe("/api/models context window enrichment", () => {
     };
 
     expect(body.models.map((model) => model.id)).toEqual([
-      "anthropic/claude-haiku-4.5",
+      "anthropic/claude-haiku-4-5",
     ]);
   });
 
-  test("keeps gateway context window when models.dev only has related ids", async () => {
-    gatewayModels.push({
-      id: "openai/gpt-5.3-codex-2026-02-15",
-      modelType: "language",
-      context_window: 200_000,
-    });
-
-    modelsDevApiData = {
-      openai: {
-        models: {
-          "gpt-5": {
-            limit: { context: 272_000 },
-          },
-          "gpt-5.3-codex": {
-            limit: { context: 400_000 },
-          },
-        },
-      },
-    };
-
-    const { GET } = await routeModulePromise;
-    const response = await GET(new Request("http://localhost/api/models"));
-
-    expect(response.ok).toBe(true);
-
-    const body = (await response.json()) as {
-      models: Array<{ id: string; context_window?: number }>;
-    };
-
-    expect(body.models).toHaveLength(1);
-    expect(body.models[0]?.context_window).toBe(200_000);
-  });
-
   test("keeps valid models.dev metadata when sibling fields are invalid", async () => {
-    gatewayModels.push({
-      id: "openai/gpt-5.3-codex",
-      modelType: "language",
-      context_window: 200_000,
+    anthropicModels.push({
+      id: "claude-opus-4-6",
+      display_name: "Claude Opus 4.6",
+      type: "model",
     });
 
     modelsDevApiData = {
       invalidProvider: "bad",
-      openai: {
+      anthropic: {
         models: {
-          "gpt-5.3-codex": {
+          "claude-opus-4-6": {
             limit: { context: "400_000" },
             cost: {
               input: 1.25,
@@ -245,8 +203,7 @@ describe("/api/models context window enrichment", () => {
 
     expect(body.models).toHaveLength(1);
     expect(body.models[0]).toMatchObject({
-      id: "openai/gpt-5.3-codex",
-      context_window: 200_000,
+      id: "anthropic/claude-opus-4-6",
       cost: {
         input: 1.25,
         output: 10,
@@ -257,29 +214,8 @@ describe("/api/models context window enrichment", () => {
     });
   });
 
-  test("recovers from gateway validation errors when response still includes models", async () => {
-    gatewayError = {
-      response: {
-        models: [
-          {
-            id: "openai/gpt-5.4",
-            name: "GPT 5.4",
-            description: "Latest GPT model",
-            modelType: "language",
-          },
-          {
-            id: "openai/gpt-5.4-broken",
-            modelType: "language",
-          },
-          {
-            id: "cohere/rerank-v3.5",
-            name: "Cohere Rerank 3.5",
-            description: "Reranking model",
-            modelType: "reranking",
-          },
-        ],
-      },
-    };
+  test("returns empty list when anthropic api key is not configured", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
 
     const { GET } = await routeModulePromise;
     const response = await GET(new Request("http://localhost/api/models"));
@@ -287,21 +223,25 @@ describe("/api/models context window enrichment", () => {
     expect(response.ok).toBe(true);
 
     const body = (await response.json()) as {
-      models: Array<{
-        id: string;
-        name: string;
-        description?: string | null;
-        modelType?: string;
-      }>;
+      models: Array<{ id: string }>;
     };
 
-    expect(body.models).toEqual([
-      {
-        id: "openai/gpt-5.4",
-        name: "GPT 5.4",
-        description: "Latest GPT model",
-        modelType: "language",
-      },
-    ]);
+    expect(body.models).toEqual([]);
+    expect(requestedUrls).not.toContain("https://api.anthropic.com/v1/models");
+  });
+
+  test("returns empty list when anthropic api responds with error", async () => {
+    anthropicStatus = 401;
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(new Request("http://localhost/api/models"));
+
+    expect(response.ok).toBe(true);
+
+    const body = (await response.json()) as {
+      models: Array<{ id: string }>;
+    };
+
+    expect(body.models).toEqual([]);
   });
 });
