@@ -38,7 +38,7 @@ mock.module("ai", () => ({
 }));
 
 mock.module("@open-harness/agent", () => ({
-  gateway: () => "mock-model",
+  model: () => "mock-model",
 }));
 
 mock.module("@/lib/db/accounts", () => ({

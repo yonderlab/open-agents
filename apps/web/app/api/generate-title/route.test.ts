@@ -11,7 +11,6 @@ let generateTextResult: { text: string } | Error = {
 };
 
 mock.module("ai", () => ({
-  gateway: (modelId: string) => modelId,
   generateText: async (input: { prompt: string }) => {
     generateTextCalls.push(input);
 
@@ -21,6 +20,10 @@ mock.module("ai", () => ({
 
     return generateTextResult;
   },
+}));
+
+mock.module("@open-harness/agent", () => ({
+  model: (modelId: string) => modelId,
 }));
 
 mock.module("@/lib/session/get-server-session", () => ({
