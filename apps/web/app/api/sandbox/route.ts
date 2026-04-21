@@ -1,7 +1,7 @@
 import { checkBotId } from "botid/server";
 import { botIdConfig } from "@/lib/botid";
 import { connectSandbox, type SandboxState } from "@open-harness/sandbox";
-import { sanitizeSandboxError } from "./error";
+import { sanitizeSandboxError } from "./sanitize-error";
 import {
   requireAuthenticatedUser,
   requireOwnedSession,
