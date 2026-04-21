@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { DEFAULT_SANDBOX_TIMEOUT_MS } from "@/lib/sandbox/config";
 
+process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID = "snap_test";
+
 mock.module("server-only", () => ({}));
 
 interface TestSessionRecord {

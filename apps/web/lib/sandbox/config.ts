@@ -37,13 +37,20 @@ export const CODE_SERVER_PORT = 8000;
 export const DEFAULT_WORKING_DIRECTORY = "/vercel/sandbox";
 
 /**
- * Base snapshot for fresh cloud sandboxes.
- * - Current snapshot includes: bun + jq + agent-browser + chromium + code-server
- * - Previous snapshot includes: bun + jq + agent-browser + chromium
+ * Base snapshot for fresh cloud sandboxes. Must be owned by the Vercel team the
+ * app deploys to; a snapshot built for another team will 404 at create time.
+ * When unset, sandboxes boot on a plain node22 runtime — chromium, agent-browser,
+ * and code-server are unavailable. Build one via `bun run sandbox:snapshot-base`.
  */
-export const DEFAULT_SANDBOX_BASE_SNAPSHOT_ID =
-  process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID ??
-  // Previous snapshot (bun + jq): "snap_MQ0NqdLL5qEXiYusgWL3K0yaMmql"
-  // Previous snapshot (bun + jq + agent-browser + chromium): "snap_C8tUFhwRXZky4MaFvTuwO7DH66wx"
-  // Current snapshot (bun + jq + agent-browser + chromium + code-server):
-  "snap_EjsphVxi07bFKrfojljJdIS41KHT";
+let warnedMissingBaseSnapshot = false;
+
+export function getSandboxBaseSnapshotId(): string | undefined {
+  const id = process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID;
+  if (!id && !warnedMissingBaseSnapshot) {
+    warnedMissingBaseSnapshot = true;
+    console.warn(
+      "VERCEL_SANDBOX_BASE_SNAPSHOT_ID is not set. Sandboxes will boot on plain node22 — chromium, agent-browser, and code-server will not be available.",
+    );
+  }
+  return id;
+}
