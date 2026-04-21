@@ -1,6 +1,6 @@
 import type { Sandbox } from "@open-harness/sandbox";
 import { generateText } from "ai";
-import { gateway } from "@open-harness/agent";
+import { model } from "@open-harness/agent";
 import { getGitHubAccount } from "@/lib/db/accounts";
 import { buildGitHubAuthRemoteUrl } from "@/lib/github/repo-identifiers";
 import { getAppCoAuthorTrailer } from "@/lib/github/app-auth";
@@ -159,7 +159,7 @@ async function generateCommitMessage(
     }
 
     const result = await generateText({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: model("anthropic/claude-haiku-4.5"),
       prompt: `Generate a concise git commit message for these changes. Use conventional commit format (e.g., "feat:", "fix:", "refactor:"). One line only, max 72 characters.
 
 Session context: ${sessionTitle}

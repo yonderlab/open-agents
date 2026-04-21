@@ -125,7 +125,7 @@ mock.module("@open-harness/agent", () => ({
     discoverSkillDirsCalls.push(skillDirs);
     return [];
   },
-  gateway: () => "mock-model",
+  model: () => "mock-model",
 }));
 
 mock.module("@open-harness/sandbox", () => ({

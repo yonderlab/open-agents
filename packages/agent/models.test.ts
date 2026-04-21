@@ -1,18 +1,23 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { ProviderOptionsByProvider } from "./models";
 
-mock.module("ai", () => {
-  const gateway = (modelId: string) => ({ modelId });
+mock.module("ai", () => ({
+  createProviderRegistry: () => ({
+    languageModel: (modelId: string) => ({ modelId }),
+  }),
+  defaultSettingsMiddleware: (_settings: unknown) => ({
+    kind: "default-settings-middleware",
+  }),
+  wrapLanguageModel: ({ model }: { model: unknown }) => model,
+}));
 
-  return {
-    createGateway: () => gateway,
-    defaultSettingsMiddleware: (_settings: unknown) => ({
-      kind: "default-settings-middleware",
-    }),
-    gateway,
-    wrapLanguageModel: ({ model }: { model: unknown }) => model,
-  };
-});
+mock.module("@ai-sdk/anthropic", () => ({
+  createAnthropic: () => (modelId: string) => ({ modelId }),
+}));
+
+mock.module("@ai-sdk/openai", () => ({
+  createOpenAI: () => (modelId: string) => ({ modelId }),
+}));
 
 mock.module("@ai-sdk/devtools", () => ({
   devToolsMiddleware: () => ({ kind: "devtools-middleware" }),

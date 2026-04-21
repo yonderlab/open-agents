@@ -1,14 +1,15 @@
+import type { AnthropicLanguageModelOptions } from "@ai-sdk/anthropic";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import {
-  createGateway,
+  createProviderRegistry,
   defaultSettingsMiddleware,
-  gateway as aiGateway,
   wrapLanguageModel,
-  type GatewayModelId,
+  type GatewayModelId as ProviderModelId,
   type JSONValue,
   type LanguageModel,
 } from "ai";
-import type { AnthropicLanguageModelOptions } from "@ai-sdk/anthropic";
-import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
 // Models with 4.5+ support adaptive thinking with effort control.
 // Older models use the legacy extended thinking API with a budget.
@@ -84,17 +85,11 @@ export function mergeProviderOptions(
   return merged;
 }
 
-export interface GatewayConfig {
-  baseURL: string;
-  apiKey: string;
-}
-
-export interface GatewayOptions {
-  config?: GatewayConfig;
+export interface ModelOptions {
   providerOptionsOverrides?: ProviderOptionsByProvider;
 }
 
-export type { GatewayModelId, LanguageModel, JSONValue };
+export type { ProviderModelId, LanguageModel, JSONValue };
 
 export function shouldApplyOpenAIReasoningDefaults(modelId: string): boolean {
   return modelId.startsWith("openai/gpt-5");
@@ -164,18 +159,47 @@ export function getProviderOptionsForModel(
   return providerOptions;
 }
 
-export function gateway(
-  modelId: GatewayModelId,
-  options: GatewayOptions = {},
+// Vercel's AI Gateway uses dotted version suffixes (e.g. "claude-opus-4.6")
+// while provider SDKs expect hyphen-separated IDs (e.g. "claude-opus-4-6").
+// Normalize so existing provider-prefixed ids keep working when routed directly.
+function normalizeModelIdForProvider(providerModelId: string): string {
+  return providerModelId.replaceAll(".", "-");
+}
+
+// Registry is module-scoped so providers are constructed once per process.
+// Auth is picked up from env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY) by each SDK.
+// OpenAI is wired up but optional — only fails at request time if no key is set.
+// The `separator: "/"` option matches our model-id format ("anthropic/claude-opus-4.6").
+// The default separator is ":", so this must be set explicitly.
+const registry = createProviderRegistry(
+  {
+    anthropic: createAnthropic(),
+    openai: createOpenAI(),
+  },
+  { separator: "/" },
+);
+
+export function model(
+  modelId: ProviderModelId,
+  options: ModelOptions = {},
 ): LanguageModel {
-  const { config, providerOptionsOverrides } = options;
+  const { providerOptionsOverrides } = options;
 
-  // Use custom gateway config or default AI SDK gateway
-  const baseGateway = config
-    ? createGateway({ baseURL: config.baseURL, apiKey: config.apiKey })
-    : aiGateway;
+  const [providerId, ...rest] = modelId.split("/");
+  const providerModelId = rest.join("/");
 
-  let model: LanguageModel = baseGateway(modelId);
+  if (!providerId || !providerModelId) {
+    throw new Error(
+      `Invalid model id "${modelId}". Expected "provider/model" format.`,
+    );
+  }
+
+  const normalizedId =
+    `${providerId}/${normalizeModelIdForProvider(providerModelId)}` as const;
+
+  let resolved: LanguageModel = registry.languageModel(
+    normalizedId as Parameters<typeof registry.languageModel>[0],
+  );
 
   const providerOptions = getProviderOptionsForModel(
     modelId,
@@ -183,13 +207,13 @@ export function gateway(
   );
 
   if (Object.keys(providerOptions).length > 0) {
-    model = wrapLanguageModel({
-      model,
+    resolved = wrapLanguageModel({
+      model: resolved,
       middleware: defaultSettingsMiddleware({
         settings: { providerOptions },
       }),
     });
   }
 
-  return model;
+  return resolved;
 }

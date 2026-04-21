@@ -1,5 +1,5 @@
 import type { Sandbox } from "@open-harness/sandbox";
-import { gateway } from "@open-harness/agent";
+import { model } from "@open-harness/agent";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -302,7 +302,7 @@ export async function generatePullRequestContentFromSandbox(
   let prContent: z.infer<typeof prContentSchema>;
   try {
     const { output } = await generateText({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: model("anthropic/claude-haiku-4.5"),
       output: Output.object({
         schema: prContentSchema,
       }),

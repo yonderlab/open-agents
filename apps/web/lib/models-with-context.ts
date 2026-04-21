@@ -1,6 +1,5 @@
 import "server-only";
 
-import { gateway } from "ai";
 import { z } from "zod";
 import { filterDisabledModels } from "./model-availability";
 import type {
@@ -13,6 +12,12 @@ import type {
 const MODELS_DEV_URL = "https://models.dev/api.json";
 const MODELS_DEV_TIMEOUT_MS = 750;
 
+const ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models";
+const ANTHROPIC_API_VERSION = "2023-06-01";
+// Higher than the models.dev enrichment timeout: the Anthropic list is the
+// primary source, so we'd rather wait than serve an empty picker.
+const ANTHROPIC_FETCH_TIMEOUT_MS = 3000;
+
 type GatewayModel = GatewayAvailableModel;
 
 interface ModelsDevMetadata {
@@ -22,19 +27,14 @@ interface ModelsDevMetadata {
 
 const recordSchema = z.object({}).catchall(z.unknown());
 
-const gatewayModelSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().nullish(),
-    modelType: z.string().nullish(),
-  })
-  .passthrough();
+const anthropicModelSchema = z.object({
+  id: z.string(),
+  display_name: z.string().optional(),
+  type: z.string().optional(),
+});
 
-const gatewayErrorSchema = z.object({
-  response: z.object({
-    models: z.array(z.unknown()),
-  }),
+const anthropicListResponseSchema = z.object({
+  data: z.array(anthropicModelSchema),
 });
 
 const modelsDevLimitSchema = z
@@ -50,20 +50,6 @@ const modelsDevCostTierSchema = z
     cache_read: z.number().finite().optional(),
   })
   .passthrough();
-
-function getModelsFromGatewayError(error: unknown): GatewayModel[] | undefined {
-  const parsed = gatewayErrorSchema.safeParse(error);
-  if (!parsed.success) {
-    return undefined;
-  }
-
-  const models = parsed.data.response.models.flatMap((model) => {
-    const parsedModel = gatewayModelSchema.safeParse(model);
-    return parsedModel.success ? [parsedModel.data] : [];
-  });
-
-  return models.length > 0 ? models : undefined;
-}
 
 function getModelsDevCostTier(
   value: unknown,
@@ -201,27 +187,54 @@ function addModelsDevMetadata(
   return nextModel;
 }
 
-async function fetchGatewayModels(): Promise<GatewayModel[]> {
+async function fetchAnthropicLanguageModels(): Promise<GatewayModel[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return [];
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    ANTHROPIC_FETCH_TIMEOUT_MS,
+  );
+
   try {
-    const { models } = await gateway.getAvailableModels();
-    return models;
-  } catch (error) {
-    const models = getModelsFromGatewayError(error);
-    if (models) {
-      return models;
+    const response = await fetch(ANTHROPIC_MODELS_URL, {
+      signal: controller.signal,
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+      },
+    });
+
+    if (!response.ok) {
+      return [];
     }
 
-    throw error;
+    const raw: unknown = await response.json();
+    const parsed = anthropicListResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      return [];
+    }
+
+    return parsed.data.data.map((entry) => ({
+      id: `anthropic/${entry.id}`,
+      name: entry.display_name ?? entry.id,
+      modelType: "language",
+    }));
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export async function fetchAvailableLanguageModels(): Promise<
   AvailableModel[]
 > {
-  const models = await fetchGatewayModels();
-  return filterDisabledModels(
-    models.filter((model) => model.modelType === "language"),
-  );
+  const models = await fetchAnthropicLanguageModels();
+  return filterDisabledModels(models);
 }
 
 export async function fetchAvailableLanguageModelsWithContext(): Promise<
