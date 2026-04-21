@@ -14,9 +14,9 @@ import {
   refreshBaseSnapshot,
 } from "@open-harness/sandbox/vercel";
 import {
-  DEFAULT_SANDBOX_BASE_SNAPSHOT_ID,
   DEFAULT_SANDBOX_PORTS,
   DEFAULT_SANDBOX_TIMEOUT_MS,
+  getSandboxBaseSnapshotId,
 } from "../apps/web/lib/sandbox/config";
 
 const SANDBOX_BASE_SNAPSHOT_CONFIG_PATH = "apps/web/lib/sandbox/config.ts";
@@ -45,7 +45,7 @@ Options:
   --help                       Show this message
 
 Current configured base snapshot:
-  ${DEFAULT_SANDBOX_BASE_SNAPSHOT_ID}`);
+  ${process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID ?? "(unset — pass --from)"}`);
 }
 
 function requireOptionValue(
@@ -131,8 +131,15 @@ async function main() {
     return;
   }
 
+  const baseSnapshotId = parsed.baseSnapshotId ?? getSandboxBaseSnapshotId();
+  if (!baseSnapshotId) {
+    throw new Error(
+      "No base snapshot provided. Pass --from <snapshot-id> or set VERCEL_SANDBOX_BASE_SNAPSHOT_ID.",
+    );
+  }
+
   const result = await refreshBaseSnapshot({
-    baseSnapshotId: parsed.baseSnapshotId ?? DEFAULT_SANDBOX_BASE_SNAPSHOT_ID,
+    baseSnapshotId,
     commands: parsed.commands,
     sandboxTimeoutMs: parsed.sandboxTimeoutMs ?? DEFAULT_SANDBOX_TIMEOUT_MS,
     commandTimeoutMs: parsed.commandTimeoutMs,
