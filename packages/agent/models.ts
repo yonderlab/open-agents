@@ -11,10 +11,18 @@ import {
   type LanguageModel,
 } from "ai";
 
-// Models with 4.5+ support adaptive thinking with effort control.
-// Older models use the legacy extended thinking API with a budget.
+// Opus 4.6, Opus 4.7, and Sonnet 4.6 use adaptive thinking with effort control.
+// Opus 4.7 rejects the legacy `type: "enabled"` form outright (400).
+// Normalize the separator so IDs from the Anthropic /v1/models endpoint
+// (`claude-opus-4-7`) and legacy dotted variants (`claude-opus-4.7`) both match.
 function getAnthropicSettings(modelId: string): AnthropicLanguageModelOptions {
-  if (modelId.includes("4.6")) {
+  const normalized = modelId.replaceAll(".", "-");
+  const usesAdaptiveThinking =
+    normalized.includes("-opus-4-6") ||
+    normalized.includes("-opus-4-7") ||
+    normalized.includes("-sonnet-4-6");
+
+  if (usesAdaptiveThinking) {
     return {
       effort: "medium",
       thinking: { type: "adaptive" },
