@@ -119,6 +119,60 @@ describe("getProviderOptionsForModel", () => {
       },
     });
   });
+
+  test("applies adaptive thinking for Opus 4.7 (hyphenated id from Anthropic API)", () => {
+    const result = getProviderOptionsForModel("anthropic/claude-opus-4-7");
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "medium",
+        thinking: { type: "adaptive" },
+      },
+    });
+  });
+
+  test("applies adaptive thinking for Opus 4.7 (dotted id from legacy variants)", () => {
+    const result = getProviderOptionsForModel("anthropic/claude-opus-4.7");
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "medium",
+        thinking: { type: "adaptive" },
+      },
+    });
+  });
+
+  test("applies adaptive thinking for Opus 4.6 (hyphenated id from Anthropic API)", () => {
+    const result = getProviderOptionsForModel("anthropic/claude-opus-4-6");
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "medium",
+        thinking: { type: "adaptive" },
+      },
+    });
+  });
+
+  test("applies adaptive thinking for Sonnet 4.6", () => {
+    const result = getProviderOptionsForModel("anthropic/claude-sonnet-4-6");
+
+    expect(result).toEqual({
+      anthropic: {
+        effort: "medium",
+        thinking: { type: "adaptive" },
+      },
+    });
+  });
+
+  test("keeps legacy extended thinking for Haiku 4.5", () => {
+    const result = getProviderOptionsForModel("anthropic/claude-haiku-4-5");
+
+    expect(result).toEqual({
+      anthropic: {
+        thinking: { type: "enabled", budgetTokens: 8000 },
+      },
+    });
+  });
 });
 
 describe("mergeProviderOptions", () => {
